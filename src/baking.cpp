@@ -22,32 +22,25 @@
 #include <sharedutils/util_baking.hpp>
 #include <scene/mesh.h>
 
-void unirender::baking::prepare_bake_data(
-	const cycles::Renderer &renderer,unirender::Object &o,util::baking::BakePixel *pixelArray,uint32_t numPixels,
-	uint32_t imgWidth,uint32_t imgHeight,bool useLightmapUvs
-)
+void unirender::baking::prepare_bake_data(const cycles::Renderer &renderer, unirender::Object &o, util::baking::BakePixel *pixelArray, uint32_t numPixels, uint32_t imgWidth, uint32_t imgHeight, bool useLightmapUvs)
 {
 	auto objId = renderer.FindCCLObjectId(*renderer.FindCclObject(o));
 	assert(objId.has_value());
-	
+
 	auto &mesh = o.GetMesh();
 	auto *cclMesh = renderer.FindCclMesh(mesh);
 	auto &tris = cclMesh->get_triangles();
 	auto &uvs = useLightmapUvs ? mesh.GetLightmapUvs() : mesh.GetUvs();
-	auto numTris = tris.size() /3;
+	auto numTris = tris.size() / 3;
 
 	util::baking::MeshInterface meshInterface {};
 	meshInterface.getTriangle = [&tris](uint32_t idx) -> util::baking::Triangle {
-		auto offset = idx *3;
-		return {
-			static_cast<uint32_t>(tris[offset]),
-			static_cast<uint32_t>(tris[offset +1]),
-			static_cast<uint32_t>(tris[offset +2])
-		};
+		auto offset = idx * 3;
+		return {static_cast<uint32_t>(tris[offset]), static_cast<uint32_t>(tris[offset + 1]), static_cast<uint32_t>(tris[offset + 2])};
 	};
 	meshInterface.getUv = [&uvs](uint32_t vertIdx) -> util::baking::Uv {
 		auto &uv = uvs[vertIdx];
-		return {uv.x,uv.y};
+		return {uv.x, uv.y};
 	};
 
 	util::baking::BakeDataView bd;
@@ -60,8 +53,5 @@ void unirender::baking::prepare_bake_data(
 	zspan.span1.resize(zspan.recty);
 	zspan.span2.resize(zspan.recty);
 
-	util::baking::prepare_bake_pixel_data(
-		bd,*objId,meshInterface,numTris,
-		imgWidth,imgHeight
-	);
+	util::baking::prepare_bake_pixel_data(bd, *objId, meshInterface, numTris, imgWidth, imgHeight);
 }
