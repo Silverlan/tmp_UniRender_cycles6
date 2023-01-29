@@ -56,10 +56,9 @@
 
 static void validate_session(ccl::Scene &scene)
 {
-	for(auto *shader : scene.shaders)
-	{
+	for(auto *shader : scene.shaders) {
 		if(shader->graph == nullptr)
-			throw std::logic_error{"Found shader with invalid graph!"};
+			throw std::logic_error {"Found shader with invalid graph!"};
 	}
 }
 
@@ -71,62 +70,47 @@ static void fix_nan_pixels(uimg::ImageBuffer &imgBuf)
 {
 	auto w = imgBuf.GetWidth();
 	auto h = imgBuf.GetHeight();
-	for(auto x=decltype(w){0u};x<w;++x)
-	{
-		for(auto y=decltype(h){0u};y<h;++y)
-		{
-			auto view = imgBuf.GetPixelView(x,y);
-			Vector3 color {
-				view.GetFloatValue(uimg::Channel::R),
-				view.GetFloatValue(uimg::Channel::G),
-				view.GetFloatValue(uimg::Channel::B)
-			};
-			if(std::isnan(color.x) || std::isnan(color.y) || std::isnan(color.z))
-			{
+	for(auto x = decltype(w) {0u}; x < w; ++x) {
+		for(auto y = decltype(h) {0u}; y < h; ++y) {
+			auto view = imgBuf.GetPixelView(x, y);
+			Vector3 color {view.GetFloatValue(uimg::Channel::R), view.GetFloatValue(uimg::Channel::G), view.GetFloatValue(uimg::Channel::B)};
+			if(std::isnan(color.x) || std::isnan(color.y) || std::isnan(color.z)) {
 				std::vector<Vector4> neighborValues;
-				auto addNeighborValue = [&neighborValues,&imgBuf,w,h](uint32_t x,uint32_t y) {
+				auto addNeighborValue = [&neighborValues, &imgBuf, w, h](uint32_t x, uint32_t y) {
 					if(x >= w || y >= h)
 						return;
-					auto view = imgBuf.GetPixelView(x,y);
-					Vector4 color {
-						view.GetFloatValue(uimg::Channel::R),
-						view.GetFloatValue(uimg::Channel::G),
-						view.GetFloatValue(uimg::Channel::B),
-						view.GetFloatValue(uimg::Channel::A)
-					};
-					if(
-						std::isnan(color[0]) || std::isnan(color[1]) || std::isnan(color[2]) || std::isnan(color[3]) ||
-						color[3] == 0.f
-					)
+					auto view = imgBuf.GetPixelView(x, y);
+					Vector4 color {view.GetFloatValue(uimg::Channel::R), view.GetFloatValue(uimg::Channel::G), view.GetFloatValue(uimg::Channel::B), view.GetFloatValue(uimg::Channel::A)};
+					if(std::isnan(color[0]) || std::isnan(color[1]) || std::isnan(color[2]) || std::isnan(color[3]) || color[3] == 0.f)
 						return;
 					neighborValues.push_back(color);
 				};
 
-				addNeighborValue(x -1,y);
-				addNeighborValue(x -1,y -1);
-				addNeighborValue(x -1,y +1);
+				addNeighborValue(x - 1, y);
+				addNeighborValue(x - 1, y - 1);
+				addNeighborValue(x - 1, y + 1);
 
-				addNeighborValue(x +1,y);
-				addNeighborValue(x +1,y -1);
-				addNeighborValue(x +1,y +1);
+				addNeighborValue(x + 1, y);
+				addNeighborValue(x + 1, y - 1);
+				addNeighborValue(x + 1, y + 1);
 
-				addNeighborValue(x,y -1);
-				addNeighborValue(x -1,y -1);
-				addNeighborValue(x +1,y -1);
+				addNeighborValue(x, y - 1);
+				addNeighborValue(x - 1, y - 1);
+				addNeighborValue(x + 1, y - 1);
 
-				addNeighborValue(x,y +1);
-				addNeighborValue(x -1,y +1);
-				addNeighborValue(x +1,y +1);
+				addNeighborValue(x, y + 1);
+				addNeighborValue(x - 1, y + 1);
+				addNeighborValue(x + 1, y + 1);
 
-				Vector4 avg{};
+				Vector4 avg {};
 				for(auto &p : neighborValues)
 					avg += p;
 				if(!neighborValues.empty())
-					avg = avg /static_cast<float>(neighborValues.size());
+					avg = avg / static_cast<float>(neighborValues.size());
 
-				view.SetValue(uimg::Channel::R,avg.x);
-				view.SetValue(uimg::Channel::G,avg.y);
-				view.SetValue(uimg::Channel::B,avg.z);
+				view.SetValue(uimg::Channel::R, avg.x);
+				view.SetValue(uimg::Channel::G, avg.y);
+				view.SetValue(uimg::Channel::B, avg.z);
 			}
 		}
 	}
@@ -155,323 +139,302 @@ static void debug_dump_images(std::unordered_map<std::string,std::array<std::sha
 }
 #endif
 
-util::EventReply unirender::cycles::Renderer::HandleRenderStage(RenderWorker &worker,unirender::Renderer::ImageRenderStage stage,StereoEye eyeStage,unirender::Renderer::RenderStageResult *optResult)
+util::EventReply unirender::cycles::Renderer::HandleRenderStage(RenderWorker &worker, unirender::Renderer::ImageRenderStage stage, StereoEye eyeStage, unirender::Renderer::RenderStageResult *optResult)
 {
-	auto handled = unirender::Renderer::HandleRenderStage(worker,stage,eyeStage,optResult);
+	auto handled = unirender::Renderer::HandleRenderStage(worker, stage, eyeStage, optResult);
 	if(handled == util::EventReply::Handled)
 		return handled;
-	switch(stage)
-	{
+	switch(stage) {
 	case ImageRenderStage::InitializeScene:
-	{
-		worker.AddThread([this,&worker]() {
-			PrepareCyclesSceneForRendering();
-			std::string err;
-			if(!Initialize(*m_scene,err))
-			{
-				worker.Cancel("Failed to initialize scene: " +err);
-				return RenderStageResult::Complete;
-			}
-
-			//if(Scene::IsRenderSceneMode(m_renderMode))
-			{
-				auto &cam = m_scene->GetCamera();
-				auto stereoscopic = cam.IsStereoscopic();
-				if(stereoscopic)
-					m_cclScene->camera->set_stereo_eye(ccl::Camera::StereoEye::STEREO_LEFT);
-				ImageRenderStage initialRenderStage;
-				switch(m_renderMode)
-				{
-				case Scene::RenderMode::SceneAlbedo:
-					initialRenderStage = ImageRenderStage::SceneAlbedo;
-					break;
-				case Scene::RenderMode::SceneNormals:
-					initialRenderStage = ImageRenderStage::SceneNormals;
-					break;
-				case Scene::RenderMode::SceneDepth:
-					initialRenderStage = ImageRenderStage::SceneDepth;
-					break;
-				default:
-					initialRenderStage = ImageRenderStage::Lighting;
-					break;
-				//default:
-				//	throw std::invalid_argument{"Invalid render mode " +std::to_string(umath::to_integral(m_renderMode))};
+		{
+			worker.AddThread([this, &worker]() {
+				PrepareCyclesSceneForRendering();
+				std::string err;
+				if(!Initialize(*m_scene, err)) {
+					worker.Cancel("Failed to initialize scene: " + err);
+					return RenderStageResult::Complete;
 				}
-				StartNextRenderStage(worker,initialRenderStage,stereoscopic ? StereoEye::Left : StereoEye::None);
-				worker.Start();
-			}
-			/*else
+
+				//if(Scene::IsRenderSceneMode(m_renderMode))
+				{
+					auto &cam = m_scene->GetCamera();
+					auto stereoscopic = cam.IsStereoscopic();
+					if(stereoscopic)
+						m_cclScene->camera->set_stereo_eye(ccl::Camera::StereoEye::STEREO_LEFT);
+					ImageRenderStage initialRenderStage;
+					switch(m_renderMode) {
+					case Scene::RenderMode::SceneAlbedo:
+						initialRenderStage = ImageRenderStage::SceneAlbedo;
+						break;
+					case Scene::RenderMode::SceneNormals:
+						initialRenderStage = ImageRenderStage::SceneNormals;
+						break;
+					case Scene::RenderMode::SceneDepth:
+						initialRenderStage = ImageRenderStage::SceneDepth;
+						break;
+					default:
+						initialRenderStage = ImageRenderStage::Lighting;
+						break;
+						//default:
+						//	throw std::invalid_argument{"Invalid render mode " +std::to_string(umath::to_integral(m_renderMode))};
+					}
+					StartNextRenderStage(worker, initialRenderStage, stereoscopic ? StereoEye::Left : StereoEye::None);
+					worker.Start();
+				}
+				/*else
 			{
 				StartNextRenderStage(worker,ImageRenderStage::Bake,StereoEye::None);
 				worker.Start();
 			}*/
-			return RenderStageResult::Continue;
-		});
-		break;
-	}
+				return RenderStageResult::Continue;
+			});
+			break;
+		}
 	case ImageRenderStage::Bake:
-	{
-		// Unused
-		// StartTextureBaking(worker);
-		break;
-	}
+		{
+			// Unused
+			// StartTextureBaking(worker);
+			break;
+		}
 	case ImageRenderStage::Lighting:
 	case ImageRenderStage::SceneAlbedo:
 	case ImageRenderStage::SceneNormals:
 	case ImageRenderStage::SceneDepth:
-	{
-		if(umath::is_flag_set(m_stateFlags,StateFlags::ProgressiveRefine))
-			m_progressiveRunning = true;
-		worker.AddThread([this,&worker,stage,eyeStage]() {
-			validate_session(*m_cclScene);
+		{
+			if(umath::is_flag_set(m_stateFlags, StateFlags::ProgressiveRefine))
+				m_progressiveRunning = true;
+			worker.AddThread([this, &worker, stage, eyeStage]() {
+				validate_session(*m_cclScene);
 
-			InitStereoEye(eyeStage);
-			if(umath::is_flag_set(m_stateFlags,StateFlags::SessionWasStarted))
-			{
-				//options.session->scene->camera->need_flags_update = true;
-				//options.session->scene->camera->need_device_update = true;
-				//options.session->reset(options.session_params, session_buffer_params());
-				m_cclSession->reset(m_sessionParams,m_bufferParams);
-				m_cclSession->start();
-			}
-			else
-			{
-				umath::set_flag(m_stateFlags,StateFlags::SessionWasStarted);
-				m_cclSession->start();
-			}
-
-			auto progressMultiplier = umath::is_flag_set(m_stateFlags,StateFlags::NativeDenoising) ? 0.95f : 1.f;
-			WaitForRenderStage(worker,0.f,progressMultiplier,[this,&worker,stage,eyeStage]() mutable -> RenderStageResult {
-				if(umath::is_flag_set(m_stateFlags,StateFlags::ProgressiveRefine) == false)
-					m_cclSession->wait();
-				else if(m_progressiveRunning)
-				{
-					std::unique_lock<std::mutex> lock {m_progressiveMutex};
-					m_progressiveCondition.wait(lock);
+				InitStereoEye(eyeStage);
+				if(umath::is_flag_set(m_stateFlags, StateFlags::SessionWasStarted)) {
+					//options.session->scene->camera->need_flags_update = true;
+					//options.session->scene->camera->need_device_update = true;
+					//options.session->reset(options.session_params, session_buffer_params());
+					m_cclSession->reset(m_sessionParams, m_bufferParams);
+					m_cclSession->start();
+				}
+				else {
+					umath::set_flag(m_stateFlags, StateFlags::SessionWasStarted);
+					m_cclSession->start();
 				}
 
-				auto &resultImgBuf = GetResultImageBuffer(OUTPUT_COLOR,eyeStage);
-				if(m_bakeData)
-				{
-					auto renderMode = m_scene->GetRenderMode();
-					switch(renderMode)
-					{
-					case Scene::RenderMode::BakeAmbientOcclusion:
-						resultImgBuf = GetOutputDriver()->GetImageBuffer(OUTPUT_AO);
-						break;
-					case Scene::RenderMode::BakeDiffuseLighting:
-						GetResultImageBuffer(OUTPUT_DIFFUSE) = GetOutputDriver()->GetImageBuffer(OUTPUT_DIFFUSE);
-						break;
-					case Scene::RenderMode::BakeDiffuseLightingSeparate:
-						GetResultImageBuffer(OUTPUT_DIFFUSE_DIRECT) = GetOutputDriver()->GetImageBuffer(OUTPUT_DIFFUSE_DIRECT);
-						GetResultImageBuffer(OUTPUT_DIFFUSE_INDIRECT) = GetOutputDriver()->GetImageBuffer(OUTPUT_DIFFUSE_INDIRECT);
-						break;
-					default:
-						resultImgBuf = GetOutputDriver()->GetImageBuffer(OUTPUT_COLOR);
-						break;
+				auto progressMultiplier = umath::is_flag_set(m_stateFlags, StateFlags::NativeDenoising) ? 0.95f : 1.f;
+				WaitForRenderStage(worker, 0.f, progressMultiplier, [this, &worker, stage, eyeStage]() mutable -> RenderStageResult {
+					if(umath::is_flag_set(m_stateFlags, StateFlags::ProgressiveRefine) == false)
+						m_cclSession->wait();
+					else if(m_progressiveRunning) {
+						std::unique_lock<std::mutex> lock {m_progressiveMutex};
+						m_progressiveCondition.wait(lock);
 					}
 
-					if(Scene::IsLightmapRenderMode(renderMode))
-					{
-						worker.SetResultMessage("Fixing outliers...");
-						auto &imgBuf = GetResultImageBuffer(OUTPUT_DIFFUSE_DIRECT);
-						if(imgBuf)
-							fix_nan_pixels(*imgBuf);
+					auto &resultImgBuf = GetResultImageBuffer(OUTPUT_COLOR, eyeStage);
+					if(m_bakeData) {
+						auto renderMode = m_scene->GetRenderMode();
+						switch(renderMode) {
+						case Scene::RenderMode::BakeAmbientOcclusion:
+							resultImgBuf = GetOutputDriver()->GetImageBuffer(OUTPUT_AO);
+							break;
+						case Scene::RenderMode::BakeDiffuseLighting:
+							GetResultImageBuffer(OUTPUT_DIFFUSE) = GetOutputDriver()->GetImageBuffer(OUTPUT_DIFFUSE);
+							break;
+						case Scene::RenderMode::BakeDiffuseLightingSeparate:
+							GetResultImageBuffer(OUTPUT_DIFFUSE_DIRECT) = GetOutputDriver()->GetImageBuffer(OUTPUT_DIFFUSE_DIRECT);
+							GetResultImageBuffer(OUTPUT_DIFFUSE_INDIRECT) = GetOutputDriver()->GetImageBuffer(OUTPUT_DIFFUSE_INDIRECT);
+							break;
+						default:
+							resultImgBuf = GetOutputDriver()->GetImageBuffer(OUTPUT_COLOR);
+							break;
+						}
 
-						worker.SetResultMessage("Baking margin...");
-						for(auto &pair : m_resultImageBuffers)
-						{
-							for(auto &imgBuf : pair.second)
-							{
-								if(!imgBuf)
-									continue;
-								imgBuf->Convert(uimg::Format::RGBA_FLOAT);
+						if(Scene::IsLightmapRenderMode(renderMode)) {
+							worker.SetResultMessage("Fixing outliers...");
+							auto &imgBuf = GetResultImageBuffer(OUTPUT_DIFFUSE_DIRECT);
+							if(imgBuf)
+								fix_nan_pixels(*imgBuf);
 
-								// Apply margin
-								auto numPixels = imgBuf->GetPixelCount();
-								std::vector<uint8_t> mask_buffer {};
-								mask_buffer.resize(numPixels);
-								constexpr auto margin = 16u;
-								util::baking::fill_bake_mask(m_bakePixels, numPixels, reinterpret_cast<char*>(mask_buffer.data()));
-								uimg::bake_margin(*imgBuf, mask_buffer, margin);
+							worker.SetResultMessage("Baking margin...");
+							for(auto &pair : m_resultImageBuffers) {
+								for(auto &imgBuf : pair.second) {
+									if(!imgBuf)
+										continue;
+									imgBuf->Convert(uimg::Format::RGBA_FLOAT);
+
+									// Apply margin
+									auto numPixels = imgBuf->GetPixelCount();
+									std::vector<uint8_t> mask_buffer {};
+									mask_buffer.resize(numPixels);
+									constexpr auto margin = 16u;
+									util::baking::fill_bake_mask(m_bakePixels, numPixels, reinterpret_cast<char *>(mask_buffer.data()));
+									uimg::bake_margin(*imgBuf, mask_buffer, margin);
+								}
 							}
 						}
 					}
-				}
-				else
-				{
-					switch(stage)
-					{
-					case ImageRenderStage::SceneAlbedo:
-						resultImgBuf = GetOutputDriver()->GetImageBuffer(OUTPUT_ALBEDO);
-						break;
-					case ImageRenderStage::SceneNormals:
-						resultImgBuf = GetOutputDriver()->GetImageBuffer(OUTPUT_NORMAL);
-						break;
-					case ImageRenderStage::SceneDepth:
-						resultImgBuf = GetOutputDriver()->GetImageBuffer(OUTPUT_DEPTH);
-						break;
-					default:
-						resultImgBuf = GetOutputDriver()->GetImageBuffer(OUTPUT_COLOR);
-						break;
+					else {
+						switch(stage) {
+						case ImageRenderStage::SceneAlbedo:
+							resultImgBuf = GetOutputDriver()->GetImageBuffer(OUTPUT_ALBEDO);
+							break;
+						case ImageRenderStage::SceneNormals:
+							resultImgBuf = GetOutputDriver()->GetImageBuffer(OUTPUT_NORMAL);
+							break;
+						case ImageRenderStage::SceneDepth:
+							resultImgBuf = GetOutputDriver()->GetImageBuffer(OUTPUT_DEPTH);
+							break;
+						default:
+							resultImgBuf = GetOutputDriver()->GetImageBuffer(OUTPUT_COLOR);
+							break;
+						}
 					}
-				}
-				
-				for(auto &pair : m_resultImageBuffers)
-				{
-					for(auto &imgBuf : pair.second)
-					{
-						if(!imgBuf)
-							continue;
-						imgBuf->ToHDR();
+
+					for(auto &pair : m_resultImageBuffers) {
+						for(auto &imgBuf : pair.second) {
+							if(!imgBuf)
+								continue;
+							imgBuf->ToHDR();
+						}
 					}
-				}
 
-				// ApplyPostProcessing(*resultImageBuffer,m_renderMode);
+					// ApplyPostProcessing(*resultImageBuffer,m_renderMode);
 
-				auto tmpEyeStage = eyeStage;
-				if(UpdateStereoEye(worker,stage,tmpEyeStage))
-				{
-					GetOutputDriver()->Reset();
-					worker.Start(); // Lighting stage for the left eye is triggered by the user, but we have to start it manually for the right eye
-					return RenderStageResult::Continue;
-				}
+					auto tmpEyeStage = eyeStage;
+					if(UpdateStereoEye(worker, stage, tmpEyeStage)) {
+						GetOutputDriver()->Reset();
+						worker.Start(); // Lighting stage for the left eye is triggered by the user, but we have to start it manually for the right eye
+						return RenderStageResult::Continue;
+					}
 
-				if(stage != ImageRenderStage::Lighting || !umath::is_flag_set(m_stateFlags,StateFlags::NativeDenoising))
-					return StartNextRenderStage(worker,ImageRenderStage::FinalizeImage,eyeStage);
+					if(stage != ImageRenderStage::Lighting || !umath::is_flag_set(m_stateFlags, StateFlags::NativeDenoising))
+						return StartNextRenderStage(worker, ImageRenderStage::FinalizeImage, eyeStage);
 
-				auto &albedoImageBuffer = GetResultImageBuffer(OUTPUT_ALBEDO,eyeStage);
-				auto &normalImageBuffer = GetResultImageBuffer(OUTPUT_NORMAL,eyeStage);
-				albedoImageBuffer = GetOutputDriver()->GetImageBuffer(OUTPUT_ALBEDO);
-				normalImageBuffer = GetOutputDriver()->GetImageBuffer(OUTPUT_NORMAL);
-				assert(albedoImageBuffer != nullptr);
-				assert(normalImageBuffer != nullptr);
-				albedoImageBuffer->ToHDR();
-				normalImageBuffer->ToHDR();
+					auto &albedoImageBuffer = GetResultImageBuffer(OUTPUT_ALBEDO, eyeStage);
+					auto &normalImageBuffer = GetResultImageBuffer(OUTPUT_NORMAL, eyeStage);
+					albedoImageBuffer = GetOutputDriver()->GetImageBuffer(OUTPUT_ALBEDO);
+					normalImageBuffer = GetOutputDriver()->GetImageBuffer(OUTPUT_NORMAL);
+					assert(albedoImageBuffer != nullptr);
+					assert(normalImageBuffer != nullptr);
+					albedoImageBuffer->ToHDR();
+					normalImageBuffer->ToHDR();
 
-				std::string debugPass;
-				GetApiData().GetFromPath("debug/returnPassAsResult")(debugPass);
-				if(!debugPass.empty())
-				{
-					auto *imgBuf = FindResultImageBuffer(debugPass,eyeStage);
-					if(imgBuf)
-						GetResultImageBuffer(OUTPUT_COLOR,eyeStage) = imgBuf->Copy(uimg::Format::RGBA_FLOAT);
-					return StartNextRenderStage(worker,ImageRenderStage::FinalizeImage,eyeStage);
-				}
+					std::string debugPass;
+					GetApiData().GetFromPath("debug/returnPassAsResult")(debugPass);
+					if(!debugPass.empty()) {
+						auto *imgBuf = FindResultImageBuffer(debugPass, eyeStage);
+						if(imgBuf)
+							GetResultImageBuffer(OUTPUT_COLOR, eyeStage) = imgBuf->Copy(uimg::Format::RGBA_FLOAT);
+						return StartNextRenderStage(worker, ImageRenderStage::FinalizeImage, eyeStage);
+					}
 
-				return StartNextRenderStage(worker,ImageRenderStage::Denoise,eyeStage);
+					return StartNextRenderStage(worker, ImageRenderStage::Denoise, eyeStage);
+				});
 			});
-		});
-		break;
-	}
+			break;
+		}
 	case ImageRenderStage::Albedo:
-	{
-		ReloadProgressiveRender();
-		// Render albedo colors (required for denoising)
-		m_renderMode = Scene::RenderMode::SceneAlbedo;
-		if(eyeStage == StereoEye::Left || eyeStage == StereoEye::None)
-			InitializeAlbedoPass(true);
-		worker.AddThread([this,&worker,eyeStage,stage]() {
-			validate_session(*m_cclScene);
-			m_cclSession->start();
-			WaitForRenderStage(worker,0.95f,0.025f,[this,&worker,eyeStage,stage]() mutable -> RenderStageResult {
-				m_cclSession->wait();
-				auto &albedoImageBuffer = GetResultImageBuffer(OUTPUT_ALBEDO,eyeStage);
-				albedoImageBuffer = GetOutputDriver()->GetImageBuffer(OUTPUT_ALBEDO);
-				// ApplyPostProcessing(*albedoImageBuffer,m_renderMode);
+		{
+			ReloadProgressiveRender();
+			// Render albedo colors (required for denoising)
+			m_renderMode = Scene::RenderMode::SceneAlbedo;
+			if(eyeStage == StereoEye::Left || eyeStage == StereoEye::None)
+				InitializeAlbedoPass(true);
+			worker.AddThread([this, &worker, eyeStage, stage]() {
+				validate_session(*m_cclScene);
+				m_cclSession->start();
+				WaitForRenderStage(worker, 0.95f, 0.025f, [this, &worker, eyeStage, stage]() mutable -> RenderStageResult {
+					m_cclSession->wait();
+					auto &albedoImageBuffer = GetResultImageBuffer(OUTPUT_ALBEDO, eyeStage);
+					albedoImageBuffer = GetOutputDriver()->GetImageBuffer(OUTPUT_ALBEDO);
+					// ApplyPostProcessing(*albedoImageBuffer,m_renderMode);
 
-				auto tmpEyeStage = eyeStage;
-				if(UpdateStereoEye(worker,stage,tmpEyeStage))
-					return RenderStageResult::Continue;
+					auto tmpEyeStage = eyeStage;
+					if(UpdateStereoEye(worker, stage, tmpEyeStage))
+						return RenderStageResult::Continue;
 
-				return StartNextRenderStage(worker,ImageRenderStage::Normal,eyeStage);
+					return StartNextRenderStage(worker, ImageRenderStage::Normal, eyeStage);
+				});
 			});
-		});
-		worker.Start();
-		break;
-	}
+			worker.Start();
+			break;
+		}
 	case ImageRenderStage::Normal:
-	{
-		ReloadProgressiveRender();
-		// Render normals (required for denoising)
-		m_renderMode = Scene::RenderMode::SceneNormals;
-		if(eyeStage == StereoEye::Left || eyeStage == StereoEye::None)
-			InitializeNormalPass(true);
-		worker.AddThread([this,&worker,eyeStage,stage]() {
-			validate_session(*m_cclScene);
-			m_cclSession->start();
-			WaitForRenderStage(worker,0.975f,0.025f,[this,&worker,eyeStage,stage]() mutable -> RenderStageResult {
-				m_cclSession->wait();
-				auto &normalImageBuffer = GetResultImageBuffer(OUTPUT_NORMAL,eyeStage);
-				normalImageBuffer = GetOutputDriver()->GetImageBuffer(OUTPUT_NORMAL);
-				// ApplyPostProcessing(*normalImageBuffer,m_renderMode);
+		{
+			ReloadProgressiveRender();
+			// Render normals (required for denoising)
+			m_renderMode = Scene::RenderMode::SceneNormals;
+			if(eyeStage == StereoEye::Left || eyeStage == StereoEye::None)
+				InitializeNormalPass(true);
+			worker.AddThread([this, &worker, eyeStage, stage]() {
+				validate_session(*m_cclScene);
+				m_cclSession->start();
+				WaitForRenderStage(worker, 0.975f, 0.025f, [this, &worker, eyeStage, stage]() mutable -> RenderStageResult {
+					m_cclSession->wait();
+					auto &normalImageBuffer = GetResultImageBuffer(OUTPUT_NORMAL, eyeStage);
+					normalImageBuffer = GetOutputDriver()->GetImageBuffer(OUTPUT_NORMAL);
+					// ApplyPostProcessing(*normalImageBuffer,m_renderMode);
 
-				auto tmpEyeStage = eyeStage;
-				if(UpdateStereoEye(worker,stage,tmpEyeStage))
-					return RenderStageResult::Continue;
+					auto tmpEyeStage = eyeStage;
+					if(UpdateStereoEye(worker, stage, tmpEyeStage))
+						return RenderStageResult::Continue;
 
-				return StartNextRenderStage(worker,ImageRenderStage::Denoise,eyeStage);
+					return StartNextRenderStage(worker, ImageRenderStage::Denoise, eyeStage);
+				});
 			});
-		});
-		worker.Start();
-		break;
-	}
+			worker.Start();
+			break;
+		}
 	}
 	if(optResult)
 		*optResult = unirender::Renderer::RenderStageResult::Continue;
 	return util::EventReply::Handled;
 }
 
-void unirender::cycles::Renderer::WaitForRenderStage(RenderWorker &worker,float baseProgress,float progressMultiplier,const std::function<RenderStageResult()> &fOnComplete)
+void unirender::cycles::Renderer::WaitForRenderStage(RenderWorker &worker, float baseProgress, float progressMultiplier, const std::function<RenderStageResult()> &fOnComplete)
 {
-	for(;;)
-	{
-		worker.UpdateProgress(baseProgress +umath::min(m_cclSession->progress.get_progress(),1.0) *progressMultiplier);
+	for(;;) {
+		worker.UpdateProgress(baseProgress + umath::min(m_cclSession->progress.get_progress(), 1.0) * progressMultiplier);
 
 		if(worker.IsCancelled())
 			SetCancelled("Cancelled by application.");
 
-		if(m_restartState != 0)
-		{
-			while(m_restartState != 2);
+		if(m_restartState != 0) {
+			while(m_restartState != 2)
+				;
 			m_restartState = 0;
 			continue;
 		}
 
-		if(umath::is_flag_set(m_stateFlags,StateFlags::ReloadSessionScheduled) && (!m_displayDriver || m_displayDriver->WasTileWritten()))
-		{
-			umath::set_flag(m_stateFlags,StateFlags::ReloadSessionScheduled,false);
+		if(umath::is_flag_set(m_stateFlags, StateFlags::ReloadSessionScheduled) && (!m_displayDriver || m_displayDriver->WasTileWritten())) {
+			umath::set_flag(m_stateFlags, StateFlags::ReloadSessionScheduled, false);
 			m_cclScene->camera->need_flags_update = true;
 			m_cclScene->camera->need_device_update = true;
-			m_cclSession->reset(m_sessionParams,m_bufferParams);
+			m_cclSession->reset(m_sessionParams, m_bufferParams);
 			if(m_displayDriver)
 				m_displayDriver->ResetTileWrittenFlag();
 		}
 
-		if(umath::is_flag_set(m_stateFlags,StateFlags::ProgressiveRefine) && m_progressiveRunning == false)
+		if(umath::is_flag_set(m_stateFlags, StateFlags::ProgressiveRefine) && m_progressiveRunning == false)
 			break;
-		if(m_cclSession->progress.get_cancel())
-		{
+		if(m_cclSession->progress.get_cancel()) {
 			if(m_restartState != 0)
 				continue;
-			std::cerr<<"WARNING: Cycles rendering has been cancelled: "<<m_cclSession->progress.get_cancel_message()<<std::endl;
-			worker.Cancel(m_cclSession->progress.get_cancel_message(),1 /* error code */);
+			std::cerr << "WARNING: Cycles rendering has been cancelled: " << m_cclSession->progress.get_cancel_message() << std::endl;
+			worker.Cancel(m_cclSession->progress.get_cancel_message(), 1 /* error code */);
 			break;
 		}
-		if(m_cclSession->progress.get_error())
-		{
+		if(m_cclSession->progress.get_error()) {
 			std::string status;
 			std::string subStatus;
-			m_cclSession->progress.get_status(status,subStatus);
-			std::cerr<<"WARNING: Cycles rendering has failed at status '"<<status<<"' ("<<subStatus<<") with error: "<<m_cclSession->progress.get_error_message()<<std::endl;
-			worker.SetStatus(util::JobStatus::Failed,m_cclSession->progress.get_error_message());
+			m_cclSession->progress.get_status(status, subStatus);
+			std::cerr << "WARNING: Cycles rendering has failed at status '" << status << "' (" << subStatus << ") with error: " << m_cclSession->progress.get_error_message() << std::endl;
+			worker.SetStatus(util::JobStatus::Failed, m_cclSession->progress.get_error_message());
 			break;
 		}
-		std::string status,subStatus;
-		m_cclSession->progress.get_status(status,subStatus);
-		if(umath::min(m_cclSession->progress.get_progress(),1.0) == 1.0 || status == "Finished")
+		std::string status, subStatus;
+		m_cclSession->progress.get_status(status, subStatus);
+		if(umath::min(m_cclSession->progress.get_progress(), 1.0) == 1.0 || status == "Finished")
 			break;
-		std::this_thread::sleep_for(std::chrono::milliseconds{100});
+		std::this_thread::sleep_for(std::chrono::milliseconds {100});
 	}
 	if(worker.GetStatus() == util::JobStatus::Pending && fOnComplete != nullptr && fOnComplete() == RenderStageResult::Continue)
 		return;
@@ -481,15 +444,13 @@ void unirender::cycles::Renderer::WaitForRenderStage(RenderWorker &worker,float 
 
 void unirender::cycles::Renderer::InitStereoEye(StereoEye eyeStage)
 {
-	if(eyeStage == StereoEye::Left)
-	{
+	if(eyeStage == StereoEye::Left) {
 		// Switch to right eye
 		m_cclScene->camera->set_stereo_eye(ccl::Camera::StereoEye::STEREO_RIGHT);
 		m_cclScene->camera->need_flags_update = true;
 		m_cclScene->camera->need_device_update = true;
 	}
-	else if(eyeStage == StereoEye::Right)
-	{
+	else if(eyeStage == StereoEye::Right) {
 		// Switch back to left eye and continue with next stage
 		m_cclScene->camera->set_stereo_eye(ccl::Camera::StereoEye::STEREO_LEFT);
 		m_cclScene->camera->need_flags_update = true;
@@ -497,26 +458,24 @@ void unirender::cycles::Renderer::InitStereoEye(StereoEye eyeStage)
 	}
 }
 
-bool unirender::cycles::Renderer::UpdateStereoEye(unirender::RenderWorker &worker,ImageRenderStage stage,StereoEye &eyeStage)
+bool unirender::cycles::Renderer::UpdateStereoEye(unirender::RenderWorker &worker, ImageRenderStage stage, StereoEye &eyeStage)
 {
-	if(eyeStage == StereoEye::Left)
-	{
+	if(eyeStage == StereoEye::Left) {
 		// Switch to right eye
 		ReloadProgressiveRender(false);
-		StartNextRenderStage(worker,stage,StereoEye::Right);
+		StartNextRenderStage(worker, stage, StereoEye::Right);
 		return true;
 	}
-	else if(eyeStage == StereoEye::Right)
-	{
+	else if(eyeStage == StereoEye::Right) {
 		// Switch back to left eye and continue with next stage
 		eyeStage = StereoEye::Left;
 	}
 	return false;
 }
 
-int unirender::cycles::Renderer::GetTileSize() const {return m_cclSession->params.tile_size;}
+int unirender::cycles::Renderer::GetTileSize() const { return m_cclSession->params.tile_size; }
 
-void unirender::cycles::Renderer::ReloadProgressiveRender(bool clearExposure,bool waitForPreviousCompletion)
+void unirender::cycles::Renderer::ReloadProgressiveRender(bool clearExposure, bool waitForPreviousCompletion)
 {
 	auto &createInfo = m_scene->GetCreateInfo();
 	if(createInfo.progressive == false)
@@ -524,14 +483,11 @@ void unirender::cycles::Renderer::ReloadProgressiveRender(bool clearExposure,boo
 	m_tileManager.Reload(waitForPreviousCompletion);
 	if(clearExposure)
 		m_tileManager.SetExposure(1.f);
-	umath::set_flag(m_stateFlags,StateFlags::ProgressiveRefine,false);
+	umath::set_flag(m_stateFlags, StateFlags::ProgressiveRefine, false);
 	m_cclSession->progress.reset();
 }
 
-void unirender::cycles::Renderer::PrepareCyclesSceneForRendering()
-{
-	unirender::Renderer::PrepareCyclesSceneForRendering();
-}
+void unirender::cycles::Renderer::PrepareCyclesSceneForRendering() { unirender::Renderer::PrepareCyclesSceneForRendering(); }
 
 void unirender::cycles::Renderer::SetCancelled(const std::string &msg)
 {
@@ -563,7 +519,7 @@ bool unirender::cycles::Renderer::InitializeBakingData()
 	auto resolution = m_scene->GetResolution();
 	auto imgWidth = resolution.x;
 	auto imgHeight = resolution.y;
-	auto numPixels = imgWidth *imgHeight;
+	auto numPixels = imgWidth * imgHeight;
 	auto *o = FindObject(*bakeName);
 	auto *aoTarget = o ? FindCclObject(*o) : nullptr;
 	if(aoTarget == nullptr)
@@ -576,9 +532,9 @@ bool unirender::cycles::Renderer::InitializeBakingData()
 	m_bakeData->bakePixels = m_bakePixels.data();
 	auto bakeLightmaps = Scene::IsLightmapRenderMode(m_renderMode);
 
-	baking::prepare_bake_data(*this,*o,pixelArray.data(),numPixels,imgWidth,imgHeight,bakeLightmaps);
+	baking::prepare_bake_data(*this, *o, pixelArray.data(), numPixels, imgWidth, imgHeight, bakeLightmaps);
 
-	auto objectId = aoTarget ? FindCCLObjectId(*aoTarget) : std::optional<uint32_t>{};
+	auto objectId = aoTarget ? FindCCLObjectId(*aoTarget) : std::optional<uint32_t> {};
 	if(!objectId.has_value())
 		return false;
 	m_bakeData->objectId = *objectId;
@@ -955,29 +911,26 @@ void unirender::cycles::Renderer::StartTextureBaking(RenderWorker &worker)
 void unirender::cycles::Renderer::FinalizeAndCloseCyclesScene()
 {
 	auto stateFlags = m_scene->GetStateFlags();
-	if(m_cclSession && m_outputDriver && m_scene->IsRenderSceneMode(m_scene->GetRenderMode()) && umath::is_flag_set(m_stateFlags,StateFlags::RenderingStarted))
+	if(m_cclSession && m_outputDriver && m_scene->IsRenderSceneMode(m_scene->GetRenderMode()) && umath::is_flag_set(m_stateFlags, StateFlags::RenderingStarted))
 		GetResultImageBuffer(OUTPUT_COLOR) = GetOutputDriver()->GetImageBuffer(OUTPUT_COLOR);
 	CloseCyclesScene();
 }
 
-void unirender::cycles::Renderer::CloseRenderScene() {CloseCyclesScene();}
+void unirender::cycles::Renderer::CloseRenderScene() { CloseCyclesScene(); }
 
-void unirender::cycles::Renderer::FinalizeImage(uimg::ImageBuffer &imgBuf,StereoEye eyeStage)
+void unirender::cycles::Renderer::FinalizeImage(uimg::ImageBuffer &imgBuf, StereoEye eyeStage)
 {
 	if(!m_scene->HasBakeTarget()) // Don't need to flip if we're baking
-		imgBuf.Flip(true,true);
+		imgBuf.Flip(true, true);
 }
 
-void unirender::cycles::Renderer::SetupRenderSettings(
-	ccl::Scene &scene,ccl::Session &session,ccl::BufferParams &bufferParams,unirender::Scene::RenderMode renderMode,
-	uint32_t maxTransparencyBounces
-) const
+void unirender::cycles::Renderer::SetupRenderSettings(ccl::Scene &scene, ccl::Session &session, ccl::BufferParams &bufferParams, unirender::Scene::RenderMode renderMode, uint32_t maxTransparencyBounces) const
 {
 	auto &sceneInfo = m_scene->GetSceneInfo();
 	// Default parameters taken from Blender
 	auto &integrator = *scene.integrator;
 	auto &film = *scene.film;
-	
+
 	auto apiData = GetApiData();
 	integrator.set_min_bounce(0);
 	integrator.set_max_bounce(sceneInfo.maxBounces);
@@ -1005,8 +958,7 @@ void unirender::cycles::Renderer::SetupRenderSettings(
 	integrator.set_adaptive_min_samples(sceneInfo.adaptiveSamplingThreshold);
 
 	apiData.GetFromPath("cycles/useAdaptiveSampling")(useAdaptiveSampling);
-	if(useAdaptiveSampling)
-	{
+	if(useAdaptiveSampling) {
 		apiData.GetFromPath("cycles/adaptiveSamplingThreshold")(adaptiveSamplingThreshold);
 		apiData.GetFromPath("cycles/adaptiveMinSamples")(adaptiveMinSamples);
 	}
@@ -1088,8 +1040,7 @@ void unirender::cycles::Renderer::SetupRenderSettings(
 	film.set_exposure(1.f);
 	film.set_filter_type(ccl::FilterType::FILTER_GAUSSIAN);
 	film.set_filter_width(1.5f);
-	if(renderMode == unirender::Scene::RenderMode::RenderImage)
-	{
+	if(renderMode == unirender::Scene::RenderMode::RenderImage) {
 		film.set_mist_start(5.f);
 		film.set_mist_depth(25.f);
 		film.set_mist_falloff(2.f);
@@ -1115,67 +1066,58 @@ void unirender::cycles::Renderer::SetupRenderSettings(
 	session.params.use_profiling = false;
 	session.params.shadingsystem = ccl::ShadingSystem::SHADINGSYSTEM_SVM;
 
-	for(auto &pair : m_outputs)
-	{
-		if(pair.first == OUTPUT_COLOR)
-		{
+	for(auto &pair : m_outputs) {
+		if(pair.first == OUTPUT_COLOR) {
 			auto *pass = scene.create_node<ccl::Pass>();
-			pass->set_name(ccl::ustring{OUTPUT_COLOR});
+			pass->set_name(ccl::ustring {OUTPUT_COLOR});
 			pass->set_type(ccl::PASS_COMBINED);
 			break;
 		}
-		else if(pair.first == OUTPUT_DIFFUSE)
-		{
+		else if(pair.first == OUTPUT_DIFFUSE) {
 			auto *pass = scene.create_node<ccl::Pass>();
-			pass->set_name(ccl::ustring{OUTPUT_DIFFUSE});
+			pass->set_name(ccl::ustring {OUTPUT_DIFFUSE});
 			pass->set_type(ccl::PASS_DIFFUSE);
 			pass->set_include_albedo(false);
 		}
-		else if(pair.first == OUTPUT_DIFFUSE_DIRECT)
-		{
+		else if(pair.first == OUTPUT_DIFFUSE_DIRECT) {
 			auto *pass = scene.create_node<ccl::Pass>();
-			pass->set_name(ccl::ustring{OUTPUT_DIFFUSE_DIRECT});
+			pass->set_name(ccl::ustring {OUTPUT_DIFFUSE_DIRECT});
 			pass->set_type(ccl::PASS_DIFFUSE_DIRECT);
 			pass->set_include_albedo(false);
 		}
-		else if(pair.first == OUTPUT_DIFFUSE_INDIRECT)
-		{
+		else if(pair.first == OUTPUT_DIFFUSE_INDIRECT) {
 			auto *pass = scene.create_node<ccl::Pass>();
-			pass->set_name(ccl::ustring{OUTPUT_DIFFUSE_INDIRECT});
+			pass->set_name(ccl::ustring {OUTPUT_DIFFUSE_INDIRECT});
 			pass->set_type(ccl::PASS_DIFFUSE_INDIRECT);
 			pass->set_include_albedo(false);
 		}
-		else if(pair.first == OUTPUT_ALBEDO)
-		{
+		else if(pair.first == OUTPUT_ALBEDO) {
 			auto *pass = scene.create_node<ccl::Pass>();
-			pass->set_name(ccl::ustring{OUTPUT_ALBEDO});
+			pass->set_name(ccl::ustring {OUTPUT_ALBEDO});
 			if(m_scene->GetRenderMode() == unirender::Scene::RenderMode::SceneAlbedo)
 				pass->set_type(ccl::PASS_DIFFUSE_COLOR);
 			else
 				pass->set_type(ccl::PASS_DENOISING_ALBEDO);
 		}
-		else if(pair.first == OUTPUT_NORMAL)
-		{
+		else if(pair.first == OUTPUT_NORMAL) {
 			auto *pass = scene.create_node<ccl::Pass>();
-			pass->set_name(ccl::ustring{OUTPUT_NORMAL});
+			pass->set_name(ccl::ustring {OUTPUT_NORMAL});
 			if(m_scene->GetRenderMode() == unirender::Scene::RenderMode::SceneNormals)
 				pass->set_type(ccl::PASS_NORMAL);
 			else
 				pass->set_type(ccl::PASS_DENOISING_NORMAL);
 		}
-		else if(pair.first == OUTPUT_DEPTH)
-		{
+		else if(pair.first == OUTPUT_DEPTH) {
 			auto *pass = scene.create_node<ccl::Pass>();
-			pass->set_name(ccl::ustring{OUTPUT_DEPTH});
+			pass->set_name(ccl::ustring {OUTPUT_DEPTH});
 			if(m_scene->GetRenderMode() == unirender::Scene::RenderMode::SceneDepth)
 				pass->set_type(ccl::PASS_DEPTH);
 			else
 				pass->set_type(ccl::PASS_DENOISING_DEPTH);
 		}
-		else if(pair.first == OUTPUT_AO)
-		{
+		else if(pair.first == OUTPUT_AO) {
 			auto *pass = scene.create_node<ccl::Pass>();
-			pass->set_name(ccl::ustring{OUTPUT_AO});
+			pass->set_name(ccl::ustring {OUTPUT_AO});
 			pass->set_type(ccl::PASS_AO);
 			pass->set_include_albedo(false);
 		}
@@ -1224,8 +1166,7 @@ void unirender::cycles::Renderer::SetupRenderSettings(
 	bufferParams.passes = passes;
 #endif
 
-	if(sceneInfo.motionBlurStrength > 0.f)
-	{
+	if(sceneInfo.motionBlurStrength > 0.f) {
 		// ccl::Pass::add(ccl::PassType::PASS_MOTION,passes);
 		scene.integrator->set_motion_blur(true);
 	}

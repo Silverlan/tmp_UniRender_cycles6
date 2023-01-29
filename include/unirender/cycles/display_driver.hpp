@@ -20,29 +20,28 @@
 #include <memory>
 #include <vector>
 
-namespace uimg {class ImageBuffer;};
-namespace util::baking {struct BakeDataView;};
-namespace unirender
-{
+namespace uimg {
+	class ImageBuffer;
+};
+namespace util::baking {
+	struct BakeDataView;
+};
+namespace unirender {
 	class TileManager;
 };
-namespace unirender::cycles
-{
-	class BaseDriver
-	{
-	public:
-		BaseDriver(uint32_t width,uint32_t height);
-		virtual ~BaseDriver()=default;
-	protected:
+namespace unirender::cycles {
+	class BaseDriver {
+	  public:
+		BaseDriver(uint32_t width, uint32_t height);
+		virtual ~BaseDriver() = default;
+	  protected:
 		uint32_t m_width = 0;
 		uint32_t m_height = 0;
 	};
 
-	class DisplayDriver
-		: public ccl::DisplayDriver,public BaseDriver
-	{
-	public:
-		DisplayDriver(unirender::TileManager &tileManager,uint32_t width,uint32_t height);
+	class DisplayDriver : public ccl::DisplayDriver, public BaseDriver {
+	  public:
+		DisplayDriver(unirender::TileManager &tileManager, uint32_t width, uint32_t height);
 		virtual ~DisplayDriver() override;
 		virtual bool update_begin(const Params &params, int width, int height) override;
 		virtual void update_end() override;
@@ -52,27 +51,26 @@ namespace unirender::cycles
 		virtual void draw(const Params &params) override;
 		virtual void next_tile_begin() override;
 
-		void ResetTileWrittenFlag() {m_tileWritten = false;}
-		bool WasTileWritten() const {return m_tileWritten;}
+		void ResetTileWrittenFlag() { m_tileWritten = false; }
+		bool WasTileWritten() const { return m_tileWritten; }
 
-		void UpdateTileResolution(uint32_t width,uint32_t height);
-	private:
-		struct TileInfo
-		{
+		void UpdateTileResolution(uint32_t width, uint32_t height);
+	  private:
+		struct TileInfo {
 			uint32_t tileIndex = 0;
 			Vector2i tileOffset {};
 			Vector2i effectiveSize {};
 		};
 		void RunPostProcessing();
-		uint32_t GetTileIndex(uint32_t x,uint32_t y) const;
+		uint32_t GetTileIndex(uint32_t x, uint32_t y) const;
 		Vector2i GetTileOffset(uint32_t idx) const;
 		Vector2i GetTileSize(uint32_t idx) const;
 
 		uint32_t m_tileWidth = 0;
 		uint32_t m_tileHeight = 0;
 		uint32_t m_numTilesX = 0;
-		Vector2i m_mappedOffset = {0,0};
-		Vector2i m_mappedSize = {0,0};
+		Vector2i m_mappedOffset = {0, 0};
+		Vector2i m_mappedSize = {0, 0};
 		uint32_t m_mappedTileIndex = 0;
 
 		unirender::TileManager &m_tileManager;
@@ -82,18 +80,16 @@ namespace unirender::cycles
 		std::condition_variable m_postProcessingCondition;
 
 		std::vector<std::shared_ptr<uimg::ImageBuffer>> m_tmpImageBuffers;
-		
+
 		std::vector<std::shared_ptr<uimg::ImageBuffer>> m_mappedTileImageBuffers;
 		std::vector<std::shared_ptr<uimg::ImageBuffer>> m_pendingForPpTileImageBuffers;
 		std::queue<TileInfo> m_imageBufferReadyForPp;
 		std::atomic<bool> m_ppThreadRunning = true;
 	};
 
-	class OutputDriver
-		: public ccl::OutputDriver,public BaseDriver
-	{
-	public:
-		OutputDriver(const std::vector<std::pair<std::string,uimg::Format>> &passes,uint32_t width,uint32_t height);
+	class OutputDriver : public ccl::OutputDriver, public BaseDriver {
+	  public:
+		OutputDriver(const std::vector<std::pair<std::string, uimg::Format>> &passes, uint32_t width, uint32_t height);
 		std::shared_ptr<uimg::ImageBuffer> GetImageBuffer(const std::string &pass) const;
 		void Reset();
 
@@ -110,12 +106,12 @@ namespace unirender::cycles
 		virtual bool read_render_tile(const Tile & /* tile */) override;
 
 		void SetBakeData(const util::baking::BakeDataView &bakeData);
-	private:
+	  private:
 		void DebugDumpImages();
 		std::vector<Vector4> m_tileData;
-		std::unordered_map<std::string,std::shared_ptr<uimg::ImageBuffer>> m_imageBuffers;
+		std::unordered_map<std::string, std::shared_ptr<uimg::ImageBuffer>> m_imageBuffers;
 		const util::baking::BakeDataView *m_bakeData = nullptr;
-		std::vector<std::pair<std::string,uimg::Format>> m_passes;
+		std::vector<std::pair<std::string, uimg::Format>> m_passes;
 	};
 };
 

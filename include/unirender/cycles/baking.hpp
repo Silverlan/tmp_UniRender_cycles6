@@ -22,16 +22,18 @@
 #include <cinttypes>
 #include <vector>
 
-namespace util::baking {struct BakePixel;};
+namespace util::baking {
+	struct BakePixel;
+};
 
-namespace unirender
-{
+namespace unirender {
 	class Object;
 	class Scene;
-	namespace cycles {class Renderer;};
-	namespace baking
-	{
-		void prepare_bake_data(const cycles::Renderer &renderer,Object &o,util::baking::BakePixel *pixelArray,uint32_t numPixels,uint32_t imgWidth,uint32_t imgHeight,bool useLightmapUvs=false);
+	namespace cycles {
+		class Renderer;
+	};
+	namespace baking {
+		void prepare_bake_data(const cycles::Renderer &renderer, Object &o, util::baking::BakePixel *pixelArray, uint32_t numPixels, uint32_t imgWidth, uint32_t imgHeight, bool useLightmapUvs = false);
 	};
 }
 

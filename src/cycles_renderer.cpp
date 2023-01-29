@@ -63,8 +63,8 @@ std::string ccl::ustring::empty_std_string;
 #endif
 
 static std::optional<std::string> KERNEL_PATH {};
-void unirender::Scene::SetKernelPath(const std::string &kernelPath) {KERNEL_PATH = kernelPath;}
-int cycles_standalone_test(int argc, const char **argv,bool initPaths);
+void unirender::Scene::SetKernelPath(const std::string &kernelPath) { KERNEL_PATH = kernelPath; }
+int cycles_standalone_test(int argc, const char **argv, bool initPaths);
 static void init_cycles()
 {
 	static auto isInitialized = false;
@@ -77,34 +77,30 @@ static void init_cycles()
 		cyclesPath = *KERNEL_PATH;
 	else
 		cyclesPath = util::get_program_path();
-	
-	for(auto &c : cyclesPath)
-	{
+
+	for(auto &c : cyclesPath) {
 		if(c == '\\')
 			c = '/';
 	}
 	auto kernelPath = cyclesPath;
-	ccl::path_init(kernelPath,kernelPath);
+	ccl::path_init(kernelPath, kernelPath);
 
-	util::set_env_variable("CYCLES_KERNEL_PATH",kernelPath);
-	util::set_env_variable("CYCLES_SHADER_PATH",kernelPath);
+	util::set_env_variable("CYCLES_KERNEL_PATH", kernelPath);
+	util::set_env_variable("CYCLES_SHADER_PATH", kernelPath);
 
 	std::optional<std::string> optixPath {};
 #ifdef _WIN32
 	TCHAR szPath[MAX_PATH];
-	if(SUCCEEDED(SHGetFolderPath(NULL, CSIDL_COMMON_APPDATA, NULL, 0, szPath)))
-	{
+	if(SUCCEEDED(SHGetFolderPath(NULL, CSIDL_COMMON_APPDATA, NULL, 0, szPath))) {
 		std::string path = szPath;
 		path += "/NVIDIA Corporation/";
 		std::vector<std::string> dirs;
-		FileManager::FindSystemFiles((path +"OptiX SDK*").c_str(),nullptr,&dirs);
-		if(!dirs.empty())
-		{
-			std::sort(dirs.begin(),dirs.end());
+		FileManager::FindSystemFiles((path + "OptiX SDK*").c_str(), nullptr, &dirs);
+		if(!dirs.empty()) {
+			std::sort(dirs.begin(), dirs.end());
 			auto dir = dirs.back(); // Presumably the latest version of the SDK
-			optixPath = path +dir;
-			for(auto &c : *optixPath)
-			{
+			optixPath = path + dir;
+			for(auto &c : *optixPath) {
 				if(c == '\\')
 					c = '/';
 			}
@@ -112,26 +108,25 @@ static void init_cycles()
 	}
 #endif
 
-	if(optixPath.has_value())
-	{
-		std::cout<<"Found Optix SDK: "<<*optixPath<<std::endl;
-		util::set_env_variable("OPTIX_ROOT_DIR",*optixPath);
+	if(optixPath.has_value()) {
+		std::cout << "Found Optix SDK: " << *optixPath << std::endl;
+		util::set_env_variable("OPTIX_ROOT_DIR", *optixPath);
 		// Note: The above should work, but for some reason it doesn't in some cases?
 		// We'll use putenv as well, just to be sure.
-		putenv(("OPTIX_ROOT_DIR=" +*optixPath).data());
+		putenv(("OPTIX_ROOT_DIR=" + *optixPath).data());
 	}
 	else
-		std::cout<<"Could not find Optix SDK! Dynamic Optix kernel building will be disabled!"<<std::endl;
+		std::cout << "Could not find Optix SDK! Dynamic Optix kernel building will be disabled!" << std::endl;
 #ifdef ENABLE_CYCLES_LOGGING
 	// ccl::util_logging_init("util_raytracing");
 	// ccl::util_logging_verbosity_set(2);
 	// ccl::util_logging_start();
 	google::InitGoogleLogging("util_raytracing");
-	google::SetLogDestination(google::GLOG_INFO,(cyclesPath +"/log/info.log").c_str());
-	google::SetLogDestination(google::GLOG_WARNING,(cyclesPath +"/log/warning.log").c_str());
-	google::SetLogDestination(google::GLOG_ERROR,(cyclesPath +"/log/error.log").c_str());
-	google::SetLogDestination(google::GLOG_FATAL,(cyclesPath +"/log/fatal.log").c_str());
-	FLAGS_log_dir = cyclesPath +"/log";
+	google::SetLogDestination(google::GLOG_INFO, (cyclesPath + "/log/info.log").c_str());
+	google::SetLogDestination(google::GLOG_WARNING, (cyclesPath + "/log/warning.log").c_str());
+	google::SetLogDestination(google::GLOG_ERROR, (cyclesPath + "/log/error.log").c_str());
+	google::SetLogDestination(google::GLOG_FATAL, (cyclesPath + "/log/fatal.log").c_str());
+	FLAGS_log_dir = cyclesPath + "/log";
 	//FLAGS_logtostderr = true;
 	//FLAGS_alsologtostderr = true; // Doesn't seem to work properly?
 	//FLAGS_stderrthreshold = google::GLOG_WARNING|google::GLOG_ERROR|google::GLOG_INFO|google::GLOG_FATAL;
@@ -148,15 +143,12 @@ static bool is_device_type_available(ccl::DeviceType type)
 	return ccl::Device::available_devices(DEVICE_MASK(type)).empty() == false;
 }
 
-ccl::float3 unirender::cycles::Renderer::ToCyclesVector(const Vector3 &v)
-{
-	return ccl::float3{v.x,v.y,v.z};
-}
+ccl::float3 unirender::cycles::Renderer::ToCyclesVector(const Vector3 &v) { return ccl::float3 {v.x, v.y, v.z}; }
 
 Vector3 unirender::cycles::Renderer::ToPragmaPosition(const ccl::float3 &pos)
 {
 	auto scale = util::pragma::units_to_metres(1.f);
-	Vector3 prPos {pos.x,pos.z,-pos.y};
+	Vector3 prPos {pos.x, pos.z, -pos.y};
 	prPos /= scale;
 	return prPos;
 }
@@ -165,9 +157,9 @@ ccl::float3 unirender::cycles::Renderer::ToCyclesPosition(const Vector3 &pos)
 {
 	auto scale = util::pragma::units_to_metres(1.f);
 #ifdef ENABLE_TEST_AMBIENT_OCCLUSION
-	ccl::float3 cpos {pos.x,-pos.z,pos.y};
+	ccl::float3 cpos {pos.x, -pos.z, pos.y};
 #else
-	ccl::float3 cpos {-pos.x,pos.y,pos.z};
+	ccl::float3 cpos {-pos.x, pos.y, pos.z};
 #endif
 	cpos *= scale;
 	return cpos;
@@ -176,51 +168,46 @@ ccl::float3 unirender::cycles::Renderer::ToCyclesPosition(const Vector3 &pos)
 ccl::float3 unirender::cycles::Renderer::ToCyclesNormal(const Vector3 &n)
 {
 #ifdef ENABLE_TEST_AMBIENT_OCCLUSION
-	return ccl::float3{n.x,-n.z,n.y};
+	return ccl::float3 {n.x, -n.z, n.y};
 #else
-	return ccl::float3{-n.x,n.y,n.z};
+	return ccl::float3 {-n.x, n.y, n.z};
 #endif
 }
 
-ccl::float2 unirender::cycles::Renderer::ToCyclesUV(const Vector2 &uv)
-{
-	return ccl::float2{uv.x,1.f -uv.y};
-}
+ccl::float2 unirender::cycles::Renderer::ToCyclesUV(const Vector2 &uv) { return ccl::float2 {uv.x, 1.f - uv.y}; }
 
-ccl::Transform unirender::cycles::Renderer::ToCyclesTransform(const umath::ScaledTransform &t,bool applyRotOffset)
+ccl::Transform unirender::cycles::Renderer::ToCyclesTransform(const umath::ScaledTransform &t, bool applyRotOffset)
 {
 	Vector3 axis;
 	float angle;
-	uquat::to_axis_angle(t.GetRotation(),axis,angle);
+	uquat::to_axis_angle(t.GetRotation(), axis, angle);
 	auto cclT = ccl::transform_identity();
-	cclT = cclT *ccl::transform_rotate(angle,ToCyclesNormal(axis));
+	cclT = cclT * ccl::transform_rotate(angle, ToCyclesNormal(axis));
 	if(applyRotOffset)
-		cclT = cclT *ccl::transform_rotate(umath::deg_to_rad(90.f),ccl::float3{1.f,0.f,0.f});
-	cclT = ccl::transform_translate(ToCyclesPosition(t.GetOrigin())) *cclT;
-	cclT = cclT *ccl::transform_scale(ToCyclesVector(t.GetScale()));
+		cclT = cclT * ccl::transform_rotate(umath::deg_to_rad(90.f), ccl::float3 {1.f, 0.f, 0.f});
+	cclT = ccl::transform_translate(ToCyclesPosition(t.GetOrigin())) * cclT;
+	cclT = cclT * ccl::transform_scale(ToCyclesVector(t.GetScale()));
 	return cclT;
 }
 
 float unirender::cycles::Renderer::ToCyclesLength(float len)
 {
 	auto scale = util::pragma::units_to_metres(1.f);
-	return len *scale;
+	return len * scale;
 }
-std::shared_ptr<unirender::cycles::Renderer> unirender::cycles::Renderer::Create(const unirender::Scene &scene,std::string &outErr,Flags flags)
+std::shared_ptr<unirender::cycles::Renderer> unirender::cycles::Renderer::Create(const unirender::Scene &scene, std::string &outErr, Flags flags)
 {
-	auto renderer = std::shared_ptr<Renderer>{new Renderer{scene,flags}};
+	auto renderer = std::shared_ptr<Renderer> {new Renderer {scene, flags}};
 	renderer->m_renderMode = scene.GetRenderMode();
 
 	auto &createInfo = scene.GetCreateInfo();
-	umath::set_flag(renderer->m_stateFlags,StateFlags::ProgressiveRefine,createInfo.progressiveRefine);
+	umath::set_flag(renderer->m_stateFlags, StateFlags::ProgressiveRefine, createInfo.progressiveRefine);
 	auto &sceneInfo = scene.GetSceneInfo();
-	const_cast<Scene::SceneInfo&>(sceneInfo).exposure = createInfo.exposure; // TODO: This doesn't belong here!
+	const_cast<Scene::SceneInfo &>(sceneInfo).exposure = createInfo.exposure; // TODO: This doesn't belong here!
 	return renderer;
 }
 
-unirender::cycles::Renderer::Renderer(const Scene &scene,Flags flags)
-	: unirender::Renderer{scene,flags}
-{}
+unirender::cycles::Renderer::Renderer(const Scene &scene, Flags flags) : unirender::Renderer {scene, flags} {}
 unirender::cycles::Renderer::~Renderer()
 {
 	FinalizeAndCloseCyclesScene();
@@ -232,17 +219,16 @@ unirender::cycles::Renderer::~Renderer()
 #endif
 }
 
-ccl::SessionParams unirender::cycles::Renderer::GetSessionParameters(const unirender::Scene &scene,const ccl::DeviceInfo &devInfo) const
+ccl::SessionParams unirender::cycles::Renderer::GetSessionParameters(const unirender::Scene &scene, const ccl::DeviceInfo &devInfo) const
 {
 	auto &createInfo = scene.GetCreateInfo();
 	ccl::SessionParams sessionParams {};
 	sessionParams.shadingsystem = ccl::SHADINGSYSTEM_SVM;
 	sessionParams.device = devInfo;
-	sessionParams.background = !umath::is_flag_set(m_flags,Flags::EnableLiveEditing); // Live denoising will not work for background mode
-	sessionParams.use_auto_tile = false; // Tile rendering is no longer relevant for Cycles X (and causes the output driver to not function properly)
+	sessionParams.background = !umath::is_flag_set(m_flags, Flags::EnableLiveEditing); // Live denoising will not work for background mode
+	sessionParams.use_auto_tile = false;                                               // Tile rendering is no longer relevant for Cycles X (and causes the output driver to not function properly)
 
-	switch(m_deviceType)
-	{
+	switch(m_deviceType) {
 	case unirender::Scene::DeviceType::GPU:
 		sessionParams.tile_size = 256;
 		break;
@@ -253,10 +239,8 @@ ccl::SessionParams unirender::cycles::Renderer::GetSessionParameters(const unire
 
 	if(createInfo.samples.has_value())
 		sessionParams.samples = *createInfo.samples;
-	else
-	{
-		switch(m_renderMode)
-		{
+	else {
+		switch(m_renderMode) {
 		case unirender::Scene::RenderMode::BakeAmbientOcclusion:
 		case unirender::Scene::RenderMode::BakeNormals:
 		case unirender::Scene::RenderMode::BakeDiffuseLighting:
@@ -269,12 +253,11 @@ ccl::SessionParams unirender::cycles::Renderer::GetSessionParameters(const unire
 		}
 	}
 
-	if(umath::is_flag_set(m_stateFlags,StateFlags::ProgressiveRefine))
+	if(umath::is_flag_set(m_stateFlags, StateFlags::ProgressiveRefine))
 		sessionParams.samples = 50'000;
 
 #ifdef ENABLE_TEST_AMBIENT_OCCLUSION
-	if(unirender::Scene::IsRenderSceneMode(m_renderMode) == false)
-	{
+	if(unirender::Scene::IsRenderSceneMode(m_renderMode) == false) {
 		//sessionParams.background = true;
 		/*sessionParams.progressive_refine = false;
 		sessionParams.progressive = false;
@@ -299,90 +282,78 @@ ccl::SessionParams unirender::cycles::Renderer::GetSessionParameters(const unire
 
 // Hip is not yet fully implemented in Cycles X, so it's currently disabled (state: 22-02-03)
 // #define ENABLE_AMD_HIP
-std::optional<ccl::DeviceInfo> unirender::cycles::Renderer::InitializeDevice(const unirender::Scene &scene,std::string &outErr)
+std::optional<ccl::DeviceInfo> unirender::cycles::Renderer::InitializeDevice(const unirender::Scene &scene, std::string &outErr)
 {
 	init_cycles();
 
 	auto cclDeviceType = ccl::DeviceType::DEVICE_CPU;
-	constexpr std::array<ccl::DeviceType,4> gpuDeviceTypes = {
-		// Order represents order of preference!
-		ccl::DeviceType::DEVICE_OPTIX,
-		ccl::DeviceType::DEVICE_CUDA,
+	constexpr std::array<ccl::DeviceType, 4> gpuDeviceTypes = {
+	  // Order represents order of preference!
+	  ccl::DeviceType::DEVICE_OPTIX, ccl::DeviceType::DEVICE_CUDA,
 #ifdef ENABLE_AMD_HIP
-		ccl::DeviceType::DEVICE_HIP,
+	  ccl::DeviceType::DEVICE_HIP,
 #endif
-		ccl::DeviceType::DEVICE_MULTI // TODO: What's this one exactly?
+	  ccl::DeviceType::DEVICE_MULTI // TODO: What's this one exactly?
 	};
 	auto devices = ccl::DeviceTypeMask::DEVICE_MASK_CUDA | ccl::DeviceTypeMask::DEVICE_MASK_OPTIX | ccl::DeviceTypeMask::DEVICE_MASK_CPU
 #ifdef ENABLE_AMD_HIP
-		 | ccl::DeviceTypeMask::DEVICE_MASK_HIP
+	  | ccl::DeviceTypeMask::DEVICE_MASK_HIP
 #endif
-		;
-	
+	  ;
+
 	auto &createInfo = scene.GetCreateInfo();
 
 	auto apiData = GetApiData();
 	std::string deviceOverride;
 	apiData.GetFromPath("cycles/device")(deviceOverride);
-	if(!deviceOverride.empty())
-	{
+	if(!deviceOverride.empty()) {
 		auto dev = ccl::Device::type_from_string(deviceOverride.c_str());
-		if(dev == ccl::DeviceType::DEVICE_NONE)
-		{
+		if(dev == ccl::DeviceType::DEVICE_NONE) {
 			std::string availableTypes;
-			for(auto devType : ccl::Device::available_types())
-			{
+			for(auto devType : ccl::Device::available_types()) {
 				if(!availableTypes.empty())
 					availableTypes += ", ";
 				availableTypes += ccl::Device::string_from_type(devType);
 			}
-			outErr = "Unknown or unsupported device '" +deviceOverride +"'! Available devices are: " +availableTypes +".";
+			outErr = "Unknown or unsupported device '" + deviceOverride + "'! Available devices are: " + availableTypes + ".";
 			return {};
 		}
 		cclDeviceType = dev;
 	}
-	else
-	{
+	else {
 		auto enableOptix = true;
 		apiData.GetFromPath("cycles/enableOptix")(enableOptix); // Optix doesn't work properly on some devices, so we need an option to disable it
-		switch(createInfo.deviceType)
-		{
+		switch(createInfo.deviceType) {
 		case unirender::Scene::DeviceType::GPU:
-		{
-			for(auto devType : gpuDeviceTypes)
 			{
-				if(is_device_type_available(devType) && (devType != ccl::DeviceType::DEVICE_OPTIX || enableOptix))
-				{
-					cclDeviceType = devType;
-					goto endLoop;
+				for(auto devType : gpuDeviceTypes) {
+					if(is_device_type_available(devType) && (devType != ccl::DeviceType::DEVICE_OPTIX || enableOptix)) {
+						cclDeviceType = devType;
+						goto endLoop;
+					}
 				}
+				// No break is intended!
 			}
-			// No break is intended!
-		}
 		case unirender::Scene::DeviceType::CPU:
 			cclDeviceType = ccl::DeviceType::DEVICE_CPU;
 			break;
 		}
 		static_assert(umath::to_integral(unirender::Scene::DeviceType::Count) == 2);
 
-	endLoop:
-		;
+	endLoop:;
 	}
 	std::optional<ccl::DeviceInfo> device = {};
-	for(auto &devInfo : ccl::Device::available_devices(devices))
-	{
-		if(devInfo.type == cclDeviceType)
-		{
+	for(auto &devInfo : ccl::Device::available_devices(devices)) {
+		if(devInfo.type == cclDeviceType) {
 			device = devInfo;
 			break;
 		}
 		if(devInfo.type == ccl::DeviceType::DEVICE_CPU)
 			device = devInfo; // Fallback / Default device type
 	}
-	
-	if(device.has_value() == false)
-	{
-		outErr = "Device '" +ccl::Device::string_from_type(cclDeviceType) +"' is not available!";
+
+	if(device.has_value() == false) {
+		outErr = "Device '" + ccl::Device::string_from_type(cclDeviceType) + "' is not available!";
 		return {}; // No device available
 	}
 
@@ -393,7 +364,7 @@ std::optional<ccl::DeviceInfo> unirender::cycles::Renderer::InitializeDevice(con
 	return device;
 }
 
-void unirender::cycles::Renderer::InitializeSession(unirender::Scene &scene,const ccl::DeviceInfo &devInfo)
+void unirender::cycles::Renderer::InitializeSession(unirender::Scene &scene, const ccl::DeviceInfo &devInfo)
 {
 	ccl::SceneParams sceneParams {};
 	sceneParams.shadingsystem = ccl::SHADINGSYSTEM_SVM;
@@ -413,8 +384,8 @@ void unirender::cycles::Renderer::InitializeSession(unirender::Scene &scene,cons
 	sceneParams.background = true;
 #endif
 
-	auto sessionParams = GetSessionParameters(scene,devInfo);
-	m_cclSession = std::make_unique<ccl::Session>(sessionParams,sceneParams);
+	auto sessionParams = GetSessionParameters(scene, devInfo);
+	m_cclSession = std::make_unique<ccl::Session>(sessionParams, sceneParams);
 
 	auto *cclScene = m_cclSession->scene; // new ccl::Scene{sceneParams,m_cclSession->device}; // Object will be removed automatically by cycles
 	cclScene->params.bvh_type = ccl::BVHType::BVH_TYPE_STATIC;
@@ -434,39 +405,39 @@ void unirender::cycles::Renderer::InitializeSession(unirender::Scene &scene,cons
 
 ccl::Object *unirender::cycles::Renderer::FindCclObject(const Object &obj)
 {
-	auto it = m_objectToCclObject.find(&const_cast<Object&>(obj));
+	auto it = m_objectToCclObject.find(&const_cast<Object &>(obj));
 	return (it != m_objectToCclObject.end()) ? it->second.object : nullptr;
 }
 ccl::Mesh *unirender::cycles::Renderer::FindCclMesh(const Mesh &mesh)
 {
-	auto it = m_meshToCcclMesh.find(&const_cast<Mesh&>(mesh));
+	auto it = m_meshToCcclMesh.find(&const_cast<Mesh &>(mesh));
 	return (it != m_meshToCcclMesh.end()) ? it->second : nullptr;
 }
 ccl::Light *unirender::cycles::Renderer::FindCclLight(const Light &light)
 {
-	auto it = m_lightToCclLight.find(&const_cast<Light&>(light));
+	auto it = m_lightToCclLight.find(&const_cast<Light &>(light));
 	return (it != m_lightToCclLight.end()) ? it->second : nullptr;
 }
 
-template<typename TSrc,typename TDst>
-	static void copy_vector_to_ccl_array(const std::vector<TSrc> &srcData,ccl::array<TDst> &dstData,const std::function<TDst(const TSrc&)> &translate)
+template<typename TSrc, typename TDst>
+static void copy_vector_to_ccl_array(const std::vector<TSrc> &srcData, ccl::array<TDst> &dstData, const std::function<TDst(const TSrc &)> &translate)
 {
-	dstData.reserve(dstData.size() +srcData.size());
+	dstData.reserve(dstData.size() + srcData.size());
 	for(auto &v : srcData)
 		dstData.push_back_reserved(translate(v));
 }
 
 template<typename T>
-	static void copy_vector_to_ccl_array(const std::vector<T> &srcData,ccl::array<T> &dstData)
+static void copy_vector_to_ccl_array(const std::vector<T> &srcData, ccl::array<T> &dstData)
 {
-	copy_vector_to_ccl_array<T,T>(srcData,dstData,[](const T &v) -> T {return v;});
+	copy_vector_to_ccl_array<T, T>(srcData, dstData, [](const T &v) -> T { return v; });
 }
 
-template<typename T,typename TCcl>
-	static void copy_vector_to_attribute(const std::vector<T> &data,ccl::Attribute &attr,const std::function<TCcl(const T&)> &translate)
+template<typename T, typename TCcl>
+static void copy_vector_to_attribute(const std::vector<T> &data, ccl::Attribute &attr, const std::function<TCcl(const T &)> &translate)
 {
 	if(attr.data_sizeof() != sizeof(TCcl))
-		throw std::logic_error{"Data size mismatch"};
+		throw std::logic_error {"Data size mismatch"};
 
 	std::vector<TCcl> cclValues;
 	cclValues.reserve(data.size());
@@ -475,26 +446,26 @@ template<typename T,typename TCcl>
 
 	attr.resize(cclValues.size());
 	auto *ptr = attr.data();
-	memcpy(ptr,cclValues.data(),cclValues.size() *sizeof(cclValues[0]));
+	memcpy(ptr, cclValues.data(), cclValues.size() * sizeof(cclValues[0]));
 }
 
-template<typename T,typename TCcl>
-	static void initialize_attribute(ccl::Geometry &mesh,ccl::AttributeStandard attrs,const std::vector<T> &data,const std::function<TCcl(const T&)> &translate)
+template<typename T, typename TCcl>
+static void initialize_attribute(ccl::Geometry &mesh, ccl::AttributeStandard attrs, const std::vector<T> &data, const std::function<TCcl(const T &)> &translate)
 {
 	auto *attr = mesh.attributes.add(attrs);
 	if(!attr)
 		return;
-	copy_vector_to_attribute(data,*attr,translate);
+	copy_vector_to_attribute(data, *attr, translate);
 }
 
 void unirender::cycles::Renderer::SyncObject(const unirender::Object &obj)
 {
-	auto *cclObj = new ccl::Object{};
+	auto *cclObj = new ccl::Object {};
 	cclObj->name = obj.GetName();
 	m_cclScene->objects.push_back(cclObj);
 	auto &pose = obj.GetPose();
 	auto cclPose = ToCyclesTransform(pose);
-	m_objectToCclObject[&obj] = {cclObj,pose};
+	m_objectToCclObject[&obj] = {cclObj, pose};
 	m_uuidToObject[util::uuid_to_string(obj.GetUuid())] = &obj;
 	cclObj->set_tfm(cclPose);
 	auto &mesh = obj.GetMesh();
@@ -503,78 +474,72 @@ void unirender::cycles::Renderer::SyncObject(const unirender::Object &obj)
 	// m_object.tag_update(*scene);
 
 #ifdef ENABLE_MOTION_BLUR_TEST
-	m_motionPose.SetOrigin(Vector3{100.f,100.f,100.f});
+	m_motionPose.SetOrigin(Vector3 {100.f, 100.f, 100.f});
 	m_object.motion.push_back_slow(Scene::ToCyclesTransform(GetMotionPose()));
 #endif
 	auto &usedShaders = cclMesh->get_used_shaders();
-	for(auto &set : mesh.GetHairStrandDataSets())
-	{
+	for(auto &set : mesh.GetHairStrandDataSets()) {
 		if(set.shaderIndex >= usedShaders.size())
 			continue;
 		auto *shader = usedShaders[set.shaderIndex];
 
-		auto *cclHair = new ccl::Hair{};
+		auto *cclHair = new ccl::Hair {};
 		m_cclScene->geometry.push_back(cclHair);
 
 		auto numHair = set.strandData.hairSegments.size();
 		uint32_t pointOffset = 0;
-		cclHair->reserve_curves(numHair,set.strandData.points.size());
+		cclHair->reserve_curves(numHair, set.strandData.points.size());
 		std::vector<Vector2> testUv;
 		testUv.reserve(numHair);
-		for(auto i=decltype(numHair){0u};i<numHair;++i)
-		{
+		for(auto i = decltype(numHair) {0u}; i < numHair; ++i) {
 			auto numSegments = set.strandData.hairSegments[i];
-			auto numPoints = numSegments +1;
-			cclHair->add_curve(pointOffset,0 /* shader */);
-			for(auto j=decltype(numPoints){0u};j<numPoints;++j)
-			{
-				auto p = pose *set.strandData.points[pointOffset +j];
-				auto thickness = set.strandData.thicknessData[pointOffset +j];
-				cclHair->add_curve_key(ToCyclesPosition(p),thickness);
+			auto numPoints = numSegments + 1;
+			cclHair->add_curve(pointOffset, 0 /* shader */);
+			for(auto j = decltype(numPoints) {0u}; j < numPoints; ++j) {
+				auto p = pose * set.strandData.points[pointOffset + j];
+				auto thickness = set.strandData.thicknessData[pointOffset + j];
+				cclHair->add_curve_key(ToCyclesPosition(p), thickness);
 			}
 			testUv.push_back(set.strandData.uvs[pointOffset]);
 
 			pointOffset += numPoints;
 		}
 
-		initialize_attribute<Vector2,ccl::float2>(*cclHair,ccl::ATTR_STD_UV,testUv,[](const Vector2 &v) -> ccl::float2 {return ToCyclesUV(v);});
+		initialize_attribute<Vector2, ccl::float2>(*cclHair, ccl::ATTR_STD_UV, testUv, [](const Vector2 &v) -> ccl::float2 { return ToCyclesUV(v); });
 
-		ccl::array<ccl::Node*> shaders;
+		ccl::array<ccl::Node *> shaders;
 		shaders.resize(1);
 		shaders[0] = shader;
 		cclHair->set_used_shaders(shaders);
 
 		//attr_uv = hair->attributes.add(name, TypeFloat2, ATTR_ELEMENT_CURVE);
 
-		auto *cclObj = new ccl::Object{};
+		auto *cclObj = new ccl::Object {};
 		m_cclScene->objects.push_back(cclObj);
 		//cclObj->set_tfm(ToCyclesTransform(obj.GetPose()));
 		cclObj->set_geometry(cclHair);
 	}
 }
 
-static ccl::ShaderInput *find_input_socket(ccl::ShaderNode &node,const char *strInput)
+static ccl::ShaderInput *find_input_socket(ccl::ShaderNode &node, const char *strInput)
 {
-	for(auto *input : node.inputs)
-	{
+	for(auto *input : node.inputs) {
 		if(ccl::string_iequals(input->socket_type.name.string(), strInput))
 			return input;
 	}
 	return nullptr;
 }
-static const ccl::SocketType *find_type_input(ccl::ShaderNode &node,const char *strInput)
+static const ccl::SocketType *find_type_input(ccl::ShaderNode &node, const char *strInput)
 {
-	for(auto &input : node.type->inputs)
-	{
+	for(auto &input : node.type->inputs) {
 		if(ccl::string_iequals(input.name.string(), strInput))
 			return &input;
 	}
 	return nullptr;
 }
-static ccl::ShaderOutput *find_output_socket(ccl::ShaderNode &node,const char *strOutput)
+static ccl::ShaderOutput *find_output_socket(ccl::ShaderNode &node, const char *strOutput)
 {
-	for(auto *output : node.outputs)
-	{
+	for(auto *output : node.outputs) {
 		if(ccl::string_iequals(output->socket_type.name.string(), strOutput))
 			return output;
 	}
@@ -582,80 +547,74 @@ static ccl::ShaderOutput *find_output_socket(ccl::ShaderNode &node,const char *s
 }
 void unirender::cycles::Renderer::SyncMesh(const unirender::Mesh &mesh)
 {
-	auto *cclMesh = new ccl::Mesh{};
+	auto *cclMesh = new ccl::Mesh {};
 	m_cclScene->geometry.push_back(cclMesh);
 	m_meshToCcclMesh[&mesh] = cclMesh;
 	m_cclMeshToMesh[cclMesh] = &mesh;
 
 	cclMesh->name = mesh.GetName();
-	cclMesh->reserve_mesh(mesh.GetVertexCount(),mesh.GetTriangleCount());
+	cclMesh->reserve_mesh(mesh.GetVertexCount(), mesh.GetTriangleCount());
 	for(auto &v : mesh.GetVertices())
 		cclMesh->add_vertex(ToCyclesPosition(v));
 	auto &tris = mesh.GetTriangles();
 	auto &shaderIds = mesh.GetShaders();
 	auto &smooth = mesh.GetSmooth();
 	auto ntris = tris.size();
-	for(auto i=decltype(ntris){0u};i<ntris;i+=3)
-		cclMesh->add_triangle(tris[i],tris[i +1],tris[i +2],shaderIds[i /3],smooth[i /3]);
+	for(auto i = decltype(ntris) {0u}; i < ntris; i += 3)
+		cclMesh->add_triangle(tris[i], tris[i + 1], tris[i + 2], shaderIds[i / 3], smooth[i / 3]);
 
-	auto fToFloat4 = [](const ccl::float3 &v) -> ccl::float4 {return ccl::float4{v.x,v.y,v.z,0.f};};
+	auto fToFloat4 = [](const ccl::float3 &v) -> ccl::float4 { return ccl::float4 {v.x, v.y, v.z, 0.f}; };
 	auto nrmDbgHandler = GetScene().GetDebugHandler("normal");
-	if(nrmDbgHandler)
-	{
+	if(nrmDbgHandler) {
 		auto pData = std::make_shared<Vector3>();
-		initialize_attribute<Vector3,ccl::float4>(*cclMesh,ccl::ATTR_STD_VERTEX_NORMAL,mesh.GetVertexNormals(),[&fToFloat4,&nrmDbgHandler,&pData](const Vector3 &v) -> ccl::float4 {
+		initialize_attribute<Vector3, ccl::float4>(*cclMesh, ccl::ATTR_STD_VERTEX_NORMAL, mesh.GetVertexNormals(), [&fToFloat4, &nrmDbgHandler, &pData](const Vector3 &v) -> ccl::float4 {
 			*pData = v;
 			nrmDbgHandler(pData);
 			auto n = *pData;
-			return fToFloat4(ccl::float3{n.x,n.y,n.z});
+			return fToFloat4(ccl::float3 {n.x, n.y, n.z});
 		});
 	}
 	else
-		initialize_attribute<Vector3,ccl::float4>(*cclMesh,ccl::ATTR_STD_VERTEX_NORMAL,mesh.GetVertexNormals(),[&fToFloat4](const Vector3 &v) -> ccl::float4 {return fToFloat4(ToCyclesNormal(v));});
-	initialize_attribute<Vector2,ccl::float2>(*cclMesh,ccl::ATTR_STD_UV,mesh.GetUvs(),[](const Vector2 &v) -> ccl::float2 {return ToCyclesUV(v);});
-	initialize_attribute<Vector3,ccl::float3>(*cclMesh,ccl::ATTR_STD_UV_TANGENT,mesh.GetUvTangents(),[](const Vector3 &v) -> ccl::float3 {return ToCyclesNormal(v);});
-	initialize_attribute<float,float>(*cclMesh,ccl::ATTR_STD_UV_TANGENT_SIGN,mesh.GetUvTangentSigns(),[](const float &v) -> float {return v;});
+		initialize_attribute<Vector3, ccl::float4>(*cclMesh, ccl::ATTR_STD_VERTEX_NORMAL, mesh.GetVertexNormals(), [&fToFloat4](const Vector3 &v) -> ccl::float4 { return fToFloat4(ToCyclesNormal(v)); });
+	initialize_attribute<Vector2, ccl::float2>(*cclMesh, ccl::ATTR_STD_UV, mesh.GetUvs(), [](const Vector2 &v) -> ccl::float2 { return ToCyclesUV(v); });
+	initialize_attribute<Vector3, ccl::float3>(*cclMesh, ccl::ATTR_STD_UV_TANGENT, mesh.GetUvTangents(), [](const Vector3 &v) -> ccl::float3 { return ToCyclesNormal(v); });
+	initialize_attribute<float, float>(*cclMesh, ccl::ATTR_STD_UV_TANGENT_SIGN, mesh.GetUvTangentSigns(), [](const float &v) -> float { return v; });
 
 	auto *attrT = cclMesh->attributes.add(ccl::ATTR_STD_UV_TANGENT);
 	if(attrT)
-		attrT->name = "orco" +Mesh::TANGENT_POSTFIX;
+		attrT->name = "orco" + Mesh::TANGENT_POSTFIX;
 
 	auto *attrTS = cclMesh->attributes.add(ccl::ATTR_STD_UV_TANGENT_SIGN);
 	if(attrTS)
-		attrTS->name = "orco" +Mesh::TANGENT_SIGN_POSTIFX;
+		attrTS->name = "orco" + Mesh::TANGENT_SIGN_POSTIFX;
 
-	if(mesh.HasAlphas())
-	{
+	if(mesh.HasAlphas()) {
 		auto &alphas = mesh.GetAlphas();
 		cclMesh->attributes.add(ALPHA_ATTRIBUTE_TYPE);
-		initialize_attribute<float,float>(*cclMesh,ALPHA_ATTRIBUTE_TYPE,*alphas,[](const float &v) -> float {return v;});
+		initialize_attribute<float, float>(*cclMesh, ALPHA_ATTRIBUTE_TYPE, *alphas, [](const float &v) -> float { return v; });
 	}
 
 	auto &shaders = mesh.GetSubMeshShaders();
-	ccl::array<ccl::Node*> usedShaders;
+	ccl::array<ccl::Node *> usedShaders;
 	usedShaders.resize(shaders.size());
 
 	auto apiData = GetApiData();
 	auto useDebugMeshShader = false;
 	apiData.GetFromPath("cycles/debug/useDebugMeshShader")(useDebugMeshShader);
-	if(useDebugMeshShader)
-	{
-		for(auto i=decltype(shaders.size()){0u};i<shaders.size();++i)
-		{
+	if(useDebugMeshShader) {
+		for(auto i = decltype(shaders.size()) {0u}; i < shaders.size(); ++i) {
 			auto *shader = AddDebugShader();
 			usedShaders[i] = shader;
 		}
 	}
-	else
-	{
-		for(auto i=decltype(shaders.size()){0u};i<shaders.size();++i)
-		{
+	else {
+		for(auto i = decltype(shaders.size()) {0u}; i < shaders.size(); ++i) {
 			auto desc = shaders.at(i)->GetActivePassNode();
 			if(desc == nullptr)
 				desc = GroupNodeDesc::Create(m_scene->GetShaderNodeManager()); // Just create a dummy node
-			auto cclShader = CCLShader::Create(*this,*desc);
+			auto cclShader = CCLShader::Create(*this, *desc);
 			if(cclShader == nullptr)
-				throw std::logic_error{"Mesh shader must never be NULL!"};
+				throw std::logic_error {"Mesh shader must never be NULL!"};
 			if(cclShader)
 				usedShaders[i] = **cclShader;
 		}
@@ -666,21 +625,19 @@ void unirender::cycles::Renderer::SyncMesh(const unirender::Mesh &mesh)
 	// TODO: We should be using the tangent values from m_tangents / m_tangentSigns
 	// but their coordinate system needs to be converted for Cycles.
 	// For now we'll just re-compute the tangents here.
-	compute_tangents(cclMesh,true,true);
+	compute_tangents(cclMesh, true, true);
 
-	if(cclMesh->need_attribute(m_cclScene,ccl::ATTR_STD_GENERATED))
-	{
+	if(cclMesh->need_attribute(m_cclScene, ccl::ATTR_STD_GENERATED)) {
 		auto *attr = cclMesh->attributes.add(ccl::ATTR_STD_GENERATED);
-		memcpy(attr->data_float3(), cclMesh->get_verts().data(), sizeof(ccl::float3) *cclMesh->get_verts().size());
+		memcpy(attr->data_float3(), cclMesh->get_verts().data(), sizeof(ccl::float3) * cclMesh->get_verts().size());
 	}
 }
 
-void unirender::cycles::Renderer::SyncCamera(const unirender::Camera &cam,bool update)
+void unirender::cycles::Renderer::SyncCamera(const unirender::Camera &cam, bool update)
 {
 	auto &cclCam = *(*this)->camera;
 
-	switch(cam.GetType())
-	{
+	switch(cam.GetType()) {
 	case unirender::Camera::CameraType::Perspective:
 		cclCam.set_camera_type(ccl::CameraType::CAMERA_PERSPECTIVE);
 		break;
@@ -692,8 +649,7 @@ void unirender::cycles::Renderer::SyncCamera(const unirender::Camera &cam,bool u
 		break;
 	}
 
-	switch(cam.GetPanoramaType())
-	{
+	switch(cam.GetPanoramaType()) {
 	case unirender::Camera::PanoramaType::Equirectangular:
 		cclCam.set_panorama_type(ccl::PanoramaType::PANORAMA_EQUIRECTANGULAR);
 		break;
@@ -718,7 +674,7 @@ void unirender::cycles::Renderer::SyncCamera(const unirender::Camera &cam,bool u
 	cclCam.set_aperture_ratio(cam.GetApertureRatio());
 	cclCam.set_blades(cam.GetBladeCount());
 	cclCam.set_bladesrotation(umath::deg_to_rad(cam.GetBladesRotation()));
-	cclCam.set_interocular_distance(units::convert<units::length::millimeter,units::length::meter>(cam.GetInterocularDistance()));
+	cclCam.set_interocular_distance(units::convert<units::length::millimeter, units::length::meter>(cam.GetInterocularDistance()));
 	cclCam.set_longitude_max(umath::deg_to_rad(cam.GetLongitudeMax()));
 	cclCam.set_longitude_min(umath::deg_to_rad(cam.GetLongitudeMin()));
 	cclCam.set_latitude_max(umath::deg_to_rad(cam.GetLatitudeMax()));
@@ -732,63 +688,59 @@ void unirender::cycles::Renderer::SyncCamera(const unirender::Camera &cam,bool u
 	if(cam.IsDofEnabled() == false)
 		cclCam.set_aperturesize(0.f);
 	auto pose = cam.GetPose();
-	if(cam.GetType() == unirender::Camera::CameraType::Panorama)
-	{
+	if(cam.GetType() == unirender::Camera::CameraType::Panorama) {
 		auto rot = cam.GetRotation();
-		switch(cam.GetPanoramaType())
-		{
+		switch(cam.GetPanoramaType()) {
 		case unirender::Camera::PanoramaType::Mirrorball:
-			rot *= uquat::create(EulerAngles{-90.f,0.f,0.f});
+			rot *= uquat::create(EulerAngles {-90.f, 0.f, 0.f});
 			break;
 		case unirender::Camera::PanoramaType::FisheyeEquisolid:
 			cclCam.set_fisheye_lens(10.5f);
 			cclCam.set_fisheye_fov(180.f);
 			// No break is intentional!
 		default:
-			rot *= uquat::create(EulerAngles{-90.f,-90.f,0.f});
+			rot *= uquat::create(EulerAngles {-90.f, -90.f, 0.f});
 			break;
 		}
 		pose.SetRotation(rot);
 	}
 
-	cclCam.set_matrix(ToCyclesTransform(pose,true));
+	cclCam.set_matrix(ToCyclesTransform(pose, true));
 	cclCam.compute_auto_viewplane();
-	
+
 	if(update)
 		return;
 	//
-	std::cout<<"Camera settings:"<<std::endl;
-	std::cout<<"Width: "<<cclCam.get_full_width()<<std::endl;
-	std::cout<<"Height: "<<cclCam.get_full_height()<<std::endl;
-	std::cout<<"NearZ: "<<cclCam.get_nearclip()<<std::endl;
-	std::cout<<"FarZ: "<<cclCam.get_farclip()<<std::endl;
-	std::cout<<"FOV: "<<umath::rad_to_deg(cclCam.get_fov())<<std::endl;
-	std::cout<<"Focal Distance: "<<cclCam.get_focaldistance()<<std::endl;
-	std::cout<<"Aperture Size: "<<cclCam.get_aperturesize()<<std::endl;
-	std::cout<<"Aperture Ratio: "<<cclCam.get_aperture_ratio()<<std::endl;
-	std::cout<<"Blades: "<<cclCam.get_blades()<<std::endl;
-	std::cout<<"Blades Rotation: "<<cclCam.get_bladesrotation()<<std::endl;
-	std::cout<<"Interocular Distance: "<<cclCam.get_interocular_distance()<<std::endl;
-	std::cout<<"Longitude Max: "<<cclCam.get_longitude_max()<<std::endl;
-	std::cout<<"Longitude Min: "<<cclCam.get_longitude_min()<<std::endl;
-	std::cout<<"Latitude Max: "<<cclCam.get_latitude_max()<<std::endl;
-	std::cout<<"Latitude Min: "<<cclCam.get_latitude_min()<<std::endl;
-	std::cout<<"Use Spherical Stereo: "<<cclCam.get_use_spherical_stereo()<<std::endl;
-	std::cout<<"Matrix: ";
+	std::cout << "Camera settings:" << std::endl;
+	std::cout << "Width: " << cclCam.get_full_width() << std::endl;
+	std::cout << "Height: " << cclCam.get_full_height() << std::endl;
+	std::cout << "NearZ: " << cclCam.get_nearclip() << std::endl;
+	std::cout << "FarZ: " << cclCam.get_farclip() << std::endl;
+	std::cout << "FOV: " << umath::rad_to_deg(cclCam.get_fov()) << std::endl;
+	std::cout << "Focal Distance: " << cclCam.get_focaldistance() << std::endl;
+	std::cout << "Aperture Size: " << cclCam.get_aperturesize() << std::endl;
+	std::cout << "Aperture Ratio: " << cclCam.get_aperture_ratio() << std::endl;
+	std::cout << "Blades: " << cclCam.get_blades() << std::endl;
+	std::cout << "Blades Rotation: " << cclCam.get_bladesrotation() << std::endl;
+	std::cout << "Interocular Distance: " << cclCam.get_interocular_distance() << std::endl;
+	std::cout << "Longitude Max: " << cclCam.get_longitude_max() << std::endl;
+	std::cout << "Longitude Min: " << cclCam.get_longitude_min() << std::endl;
+	std::cout << "Latitude Max: " << cclCam.get_latitude_max() << std::endl;
+	std::cout << "Latitude Min: " << cclCam.get_latitude_min() << std::endl;
+	std::cout << "Use Spherical Stereo: " << cclCam.get_use_spherical_stereo() << std::endl;
+	std::cout << "Matrix: ";
 	auto first = true;
-	for(uint8_t i=0;i<3;++i)
-	{
-		for(uint8_t j=0;j<4;++j)
-		{
+	for(uint8_t i = 0; i < 3; ++i) {
+		for(uint8_t j = 0; j < 4; ++j) {
 			auto v = cclCam.get_matrix()[i][j];
 			if(first)
 				first = false;
 			else
-				std::cout<<",";
-			std::cout<<v;
+				std::cout << ",";
+			std::cout << v;
 		}
 	}
-	std::cout<<std::endl;
+	std::cout << std::endl;
 	//
 
 #if 0
@@ -886,25 +838,22 @@ void unirender::cycles::Renderer::SyncCamera(const unirender::Camera &cam,bool u
 	*(*this)->dicing_camera = cclCam;
 }
 
-void unirender::cycles::Renderer::SyncLight(unirender::Scene &scene,const unirender::Light &light,bool update)
+void unirender::cycles::Renderer::SyncLight(unirender::Scene &scene, const unirender::Light &light, bool update)
 {
 	ccl::Light *cclLight = nullptr;
-	if(update)
-	{
+	if(update) {
 		auto it = m_lightToCclLight.find(&light);
 		if(it == m_lightToCclLight.end())
 			return;
 		cclLight = it->second;
 	}
-	else
-	{
-		cclLight = new ccl::Light{}; // Object will be removed automatically by cycles
+	else {
+		cclLight = new ccl::Light {}; // Object will be removed automatically by cycles
 		m_cclScene->lights.push_back(cclLight);
 		m_lightToCclLight[&light] = cclLight;
 	}
 	cclLight->set_tfm(ccl::transform_identity());
-	switch(light.GetType())
-	{
+	switch(light.GetType()) {
 	case unirender::Light::Type::Spot:
 		cclLight->set_light_type(ccl::LightType::LIGHT_SPOT);
 		break;
@@ -926,59 +875,58 @@ void unirender::cycles::Renderer::SyncLight(unirender::Scene &scene,const uniren
 		break;
 	}
 
-	switch(light.GetType())
-	{
+	switch(light.GetType()) {
 	case unirender::Light::Type::Point:
-	{
-		break;
-	}
+		{
+			break;
+		}
 	case unirender::Light::Type::Spot:
-	{
-		auto &rot = light.GetRotation();
-		auto forward = uquat::forward(rot);
-		cclLight->set_dir(ToCyclesNormal(forward));
-		cclLight->set_spot_smooth(light.GetBlendFraction());
-		cclLight->set_spot_angle(umath::deg_to_rad(light.GetOuterConeAngle()));
-		break;
-	}
+		{
+			auto &rot = light.GetRotation();
+			auto forward = uquat::forward(rot);
+			cclLight->set_dir(ToCyclesNormal(forward));
+			cclLight->set_spot_smooth(light.GetBlendFraction());
+			cclLight->set_spot_angle(umath::deg_to_rad(light.GetOuterConeAngle()));
+			break;
+		}
 	case unirender::Light::Type::Directional:
-	{
-		auto &rot = light.GetRotation();
-		auto forward = uquat::forward(rot);
-		cclLight->set_dir(ToCyclesNormal(forward));
-		break;
-	}
+		{
+			auto &rot = light.GetRotation();
+			auto forward = uquat::forward(rot);
+			cclLight->set_dir(ToCyclesNormal(forward));
+			break;
+		}
 	case unirender::Light::Type::Area:
-	{
-		auto &axisU = light.GetAxisU();
-		auto &axisV = light.GetAxisV();
-		auto sizeU = light.GetSizeU();
-		auto sizeV = light.GetSizeV();
-		cclLight->set_axisu(ToCyclesNormal(axisU));
-		cclLight->set_axisv(ToCyclesNormal(axisV));
-		cclLight->set_sizeu(ToCyclesLength(sizeU));
-		cclLight->set_sizev(ToCyclesLength(sizeV));
-		cclLight->set_round(light.IsRound());
+		{
+			auto &axisU = light.GetAxisU();
+			auto &axisV = light.GetAxisV();
+			auto sizeU = light.GetSizeU();
+			auto sizeV = light.GetSizeV();
+			cclLight->set_axisu(ToCyclesNormal(axisU));
+			cclLight->set_axisv(ToCyclesNormal(axisV));
+			cclLight->set_sizeu(ToCyclesLength(sizeU));
+			cclLight->set_sizev(ToCyclesLength(sizeV));
+			cclLight->set_round(light.IsRound());
 
-		auto &rot = light.GetRotation();
-		auto forward = uquat::forward(rot);
-		cclLight->set_dir(ToCyclesNormal(forward));
-		break;
-	}
+			auto &rot = light.GetRotation();
+			auto forward = uquat::forward(rot);
+			cclLight->set_dir(ToCyclesNormal(forward));
+			break;
+		}
 	case unirender::Light::Type::Background:
-	{
-		break;
-	}
+		{
+			break;
+		}
 	case unirender::Light::Type::Triangle:
-	{
-		break;
-	}
+		{
+			break;
+		}
 	}
 
 	auto lightType = (light.GetType() == unirender::Light::Type::Spot) ? util::pragma::LightType::Spot : (light.GetType() == unirender::Light::Type::Directional) ? util::pragma::LightType::Directional : util::pragma::LightType::Point;
-	auto watt = (lightType == util::pragma::LightType::Spot) ? ulighting::cycles::lumen_to_watt_spot(light.GetIntensity(),light.GetColor(),light.GetOuterConeAngle()) :
-		(lightType == util::pragma::LightType::Point) ? ulighting::cycles::lumen_to_watt_point(light.GetIntensity(),light.GetColor()) :
-		ulighting::cycles::lumen_to_watt_area(light.GetIntensity(),light.GetColor());
+	auto watt = (lightType == util::pragma::LightType::Spot) ? ulighting::cycles::lumen_to_watt_spot(light.GetIntensity(), light.GetColor(), light.GetOuterConeAngle())
+	  : (lightType == util::pragma::LightType::Point)        ? ulighting::cycles::lumen_to_watt_point(light.GetIntensity(), light.GetColor())
+	                                                         : ulighting::cycles::lumen_to_watt_area(light.GetIntensity(), light.GetColor());
 
 	// Multiple importance sampling. It's disabled by default for some reason, but it's usually best to keep it on.
 	// cclLight->set_use_mis(true);
@@ -991,13 +939,12 @@ void unirender::cycles::Renderer::SyncLight(unirender::Scene &scene,const uniren
 	auto customLightIntensityMultiplier = 1.f;
 	if(apiData.GetFromPath("lightIntensityMultiplier")(customLightIntensityMultiplier))
 		watt = customLightIntensityMultiplier;
-	else
-	{
+	else {
 		static auto lightIntensityMultiplier = 200.f;
-		watt *= scene.GetLightIntensityFactor() *lightIntensityMultiplier;
+		watt *= scene.GetLightIntensityFactor() * lightIntensityMultiplier;
 	}
 	auto &color = light.GetColor();
-	cclLight->set_strength(ccl::float3{color.r,color.g,color.b} *watt);
+	cclLight->set_strength(ccl::float3 {color.r, color.g, color.b} * watt);
 	cclLight->set_size(ToCyclesLength(light.GetSize()));
 	cclLight->set_co(ToCyclesPosition(light.GetPos()));
 
@@ -1005,9 +952,8 @@ void unirender::cycles::Renderer::SyncLight(unirender::Scene &scene,const uniren
 	cclLight->set_map_resolution(2'048);
 
 	auto uuid = util::uuid_to_string(light.GetUuid());
-	auto udmLight = apiData.GetFromPath("cycles/scene/actors/" +uuid);
-	if(udmLight)
-	{
+	auto udmLight = apiData.GetFromPath("cycles/scene/actors/" + uuid);
+	if(udmLight) {
 		uint32_t maxBounces;
 		if(udmLight["maxBounces"](maxBounces))
 			cclLight->set_max_bounces(maxBounces);
@@ -1018,7 +964,7 @@ void unirender::cycles::Renderer::SyncLight(unirender::Scene &scene,const uniren
 	}
 
 	cclLight->tag_update(m_cclScene);
-	// 
+	//
 	// Test
 	/*m_light->strength = ccl::float3{0.984539f,1.f,0.75f} *40.f;
 	m_light->size = 0.25f;
@@ -1030,11 +976,11 @@ void unirender::cycles::Renderer::SyncLight(unirender::Scene &scene,const uniren
 	auto desc = GroupNodeDesc::Create(scene.GetShaderNodeManager());
 	auto &outputNode = desc->AddNode(NODE_OUTPUT);
 	auto &nodeEmission = desc->AddNode(NODE_EMISSION);
-	nodeEmission.SetProperty(unirender::nodes::emission::IN_STRENGTH,1.f);
-	nodeEmission.SetProperty(unirender::nodes::emission::IN_COLOR,Vector3{1.f,1.f,1.f});
-	desc->Link(nodeEmission.GetOutputSocket("emission"),outputNode.GetInputSocket("surface"));
+	nodeEmission.SetProperty(unirender::nodes::emission::IN_STRENGTH, 1.f);
+	nodeEmission.SetProperty(unirender::nodes::emission::IN_COLOR, Vector3 {1.f, 1.f, 1.f});
+	desc->Link(nodeEmission.GetOutputSocket("emission"), outputNode.GetInputSocket("surface"));
 
-	auto shader = CCLShader::Create(*this,*desc);
+	auto shader = CCLShader::Create(*this, *desc);
 	cclLight->set_shader(**shader);
 	m_lightToShader[&light] = shader;
 }
@@ -1047,15 +993,12 @@ ccl::BufferParams unirender::cycles::Renderer::GetBufferParameters() const
 	bufferParams.height = cam.GetHeight();
 	bufferParams.full_width = cam.GetWidth();
 	bufferParams.full_height = cam.GetHeight();
-	SetupRenderSettings(*m_cclScene,*m_cclSession,bufferParams,m_renderMode,m_scene->GetSceneInfo().maxTransparencyBounces);
+	SetupRenderSettings(*m_cclScene, *m_cclSession, bufferParams, m_renderMode, m_scene->GetSceneInfo().maxTransparencyBounces);
 	return bufferParams;
 }
 
-float unirender::cycles::Renderer::GetProgress() const
-{
-	return m_cclSession->progress.get_progress();
-}
-bool unirender::cycles::Renderer::Stop() {return false;}
+float unirender::cycles::Renderer::GetProgress() const { return m_cclSession->progress.get_progress(); }
+bool unirender::cycles::Renderer::Stop() { return false; }
 bool unirender::cycles::Renderer::Pause()
 {
 	if(!m_cclSession)
@@ -1070,23 +1013,21 @@ bool unirender::cycles::Renderer::Resume()
 	m_cclSession->set_pause(false);
 	return true;
 }
-bool unirender::cycles::Renderer::Suspend() {return false;}
-bool unirender::cycles::Renderer::Export(const std::string &path) {return false;}
+bool unirender::cycles::Renderer::Suspend() { return false; }
+bool unirender::cycles::Renderer::Export(const std::string &path) { return false; }
 void unirender::cycles::Renderer::Wait()
 {
 	if(m_cclSession)
 		m_cclSession->wait();
 }
 
-void unirender::cycles::Renderer::ApplyPostProcessing(uimg::ImageBuffer &imgBuffer,unirender::Scene::RenderMode renderMode)
+void unirender::cycles::Renderer::ApplyPostProcessing(uimg::ImageBuffer &imgBuffer, unirender::Scene::RenderMode renderMode)
 {
 	// For some reason the image is flipped horizontally when rendering an image,
 	// so we'll just flip it the right way here
 	auto flipHorizontally = unirender::Scene::IsRenderSceneMode(renderMode);
-	if(m_cclScene->camera->get_camera_type() == ccl::CameraType::CAMERA_PANORAMA)
-	{
-		switch(m_cclScene->camera->get_panorama_type())
-		{
+	if(m_cclScene->camera->get_camera_type() == ccl::CameraType::CAMERA_PANORAMA) {
+		switch(m_cclScene->camera->get_panorama_type()) {
 		case ccl::PanoramaType::PANORAMA_EQUIRECTANGULAR:
 		case ccl::PanoramaType::PANORAMA_FISHEYE_EQUIDISTANT:
 			flipHorizontally = false; // I have no idea why some types have to be flipped and others don't
@@ -1104,155 +1045,142 @@ void unirender::cycles::Renderer::ApplyPostProcessing(uimg::ImageBuffer &imgBuff
 
 std::optional<uint32_t> unirender::cycles::Renderer::FindCCLObjectId(const ccl::Object &o) const
 {
-	auto it = std::find(m_cclScene->objects.begin(),m_cclScene->objects.end(),&o);
-	return (it != m_cclScene->objects.end()) ? (it -m_cclScene->objects.begin()) : std::optional<uint32_t>{};
+	auto it = std::find(m_cclScene->objects.begin(), m_cclScene->objects.end(), &o);
+	return (it != m_cclScene->objects.end()) ? (it - m_cclScene->objects.begin()) : std::optional<uint32_t> {};
 }
 
 struct Options {
-  ccl::Session *session;
-  ccl::Scene *scene;
-  ccl::string filepath;
-  int width, height;
-  ccl::SceneParams scene_params;
-  ccl::SessionParams session_params;
-  bool quiet;
-  bool show_help, interactive, pause;
-  ccl::string output_filepath;
-  ccl::string output_pass;
+	ccl::Session *session;
+	ccl::Scene *scene;
+	ccl::string filepath;
+	int width, height;
+	ccl::SceneParams scene_params;
+	ccl::SessionParams session_params;
+	bool quiet;
+	bool show_help, interactive, pause;
+	ccl::string output_filepath;
+	ccl::string output_pass;
 };
-
 
 #include "app/cycles_xml.h"
 static void scene_init(Options &options)
 {
-  options.scene = options.session->scene;
+	options.scene = options.session->scene;
 
-  /* Read XML */
- ccl::xml_read_file(options.scene, options.filepath.c_str());
+	/* Read XML */
+	ccl::xml_read_file(options.scene, options.filepath.c_str());
 
-  /* Camera width/height override? */
-  if (!(options.width == 0 || options.height == 0)) {
-    options.scene->camera->set_full_width(options.width);
-    options.scene->camera->set_full_height(options.height);
-  }
-  else {
-    options.width = options.scene->camera->get_full_width();
-    options.height = options.scene->camera->get_full_height();
-  }
+	/* Camera width/height override? */
+	if(!(options.width == 0 || options.height == 0)) {
+		options.scene->camera->set_full_width(options.width);
+		options.scene->camera->set_full_height(options.height);
+	}
+	else {
+		options.width = options.scene->camera->get_full_width();
+		options.height = options.scene->camera->get_full_height();
+	}
 
-  /* Calculate Viewplane */
-  options.scene->camera->compute_auto_viewplane();
+	/* Calculate Viewplane */
+	options.scene->camera->compute_auto_viewplane();
 }
 
 static ccl::BufferParams &session_buffer_params(Options &opts)
 {
-  static ccl::BufferParams buffer_params;
-  buffer_params.width = opts.width;
-  buffer_params.height = opts.height;
-  buffer_params.full_width = opts.width;
-  buffer_params.full_height = opts.height;
+	static ccl::BufferParams buffer_params;
+	buffer_params.width = opts.width;
+	buffer_params.height = opts.height;
+	buffer_params.full_width = opts.width;
+	buffer_params.full_height = opts.height;
 
-  return buffer_params;
+	return buffer_params;
 }
 
 static void session_print(const ccl::string &str)
 {
-  /* print with carriage return to overwrite previous */
- // printf("\r%s", str.c_str());
+	/* print with carriage return to overwrite previous */
+	// printf("\r%s", str.c_str());
 
-  /* add spaces to overwrite longer previous print */
-  static int maxlen = 0;
-  int len = str.size();
-  maxlen = ccl::max(len, maxlen);
+	/* add spaces to overwrite longer previous print */
+	static int maxlen = 0;
+	int len = str.size();
+	maxlen = ccl::max(len, maxlen);
 
-  //for (int i = len; i < maxlen; i++)
-  //  printf(" ");
+	//for (int i = len; i < maxlen; i++)
+	//  printf(" ");
 
-  /* flush because we don't write an end of line */
-  //fflush(stdout);
+	/* flush because we don't write an end of line */
+	//fflush(stdout);
 }
 
 static void session_print_status(Options &opts)
 {
-  ccl::string status, substatus;
+	ccl::string status, substatus;
 
-  /* get status */
-  double progress = opts.session->progress.get_progress();
-  opts.session->progress.get_status(status, substatus);
+	/* get status */
+	double progress = opts.session->progress.get_progress();
+	opts.session->progress.get_status(status, substatus);
 
-  if (substatus != "")
-    status += ": " + substatus;
+	if(substatus != "")
+		status += ": " + substatus;
 
-  /* print status */
-  //status = ccl::string_printf("Progress %05.2f   %s", (double)progress * 100, status.c_str());
-  //session_print(status);
+	/* print status */
+	//status = ccl::string_printf("Progress %05.2f   %s", (double)progress * 100, status.c_str());
+	//session_print(status);
 }
 
 #include <app/oiio_output_driver.h>
 
 class COIIOOutputDriver : public ccl::OutputDriver {
- public:
-  typedef ccl::function<void(const ccl::string &)> LogFunction;
+  public:
+	typedef ccl::function<void(const ccl::string &)> LogFunction;
 
-  COIIOOutputDriver(const ccl::string_view filepath, const ccl::string_view pass, LogFunction log);
-  virtual ~COIIOOutputDriver();
+	COIIOOutputDriver(const ccl::string_view filepath, const ccl::string_view pass, LogFunction log);
+	virtual ~COIIOOutputDriver();
 
-  void write_render_tile(const Tile &tile) override;
-
- protected:
-  ccl::string filepath_;
-  ccl::string pass_;
-  LogFunction log_;
+	void write_render_tile(const Tile &tile) override;
+  protected:
+	ccl::string filepath_;
+	ccl::string pass_;
+	LogFunction log_;
 };
 
-COIIOOutputDriver::COIIOOutputDriver(const ccl::string_view filepath,
-                                   const ccl::string_view pass,
-                                   LogFunction log)
-    : filepath_(filepath), pass_(pass), log_(log)
-{
-}
+COIIOOutputDriver::COIIOOutputDriver(const ccl::string_view filepath, const ccl::string_view pass, LogFunction log) : filepath_(filepath), pass_(pass), log_(log) {}
 
-COIIOOutputDriver::~COIIOOutputDriver()
-{
-}
+COIIOOutputDriver::~COIIOOutputDriver() {}
 
 void COIIOOutputDriver::write_render_tile(const Tile &tile)
 {
-  /* Only write the full buffer, no intermediate tiles. */
-  if (!(tile.size == tile.full_size)) {
-    return;
-  }
+	/* Only write the full buffer, no intermediate tiles. */
+	if(!(tile.size == tile.full_size)) {
+		return;
+	}
 
-  //log_(ccl::string_printf("Writing image %s", filepath_.c_str()));
+	//log_(ccl::string_printf("Writing image %s", filepath_.c_str()));
 
-  ccl::unique_ptr<ccl::ImageOutput> image_output(ccl::ImageOutput::create(filepath_));
-  if (image_output == nullptr) {
-    //log_("Failed to create image file");
-    return;
-  }
+	ccl::unique_ptr<ccl::ImageOutput> image_output(ccl::ImageOutput::create(filepath_));
+	if(image_output == nullptr) {
+		//log_("Failed to create image file");
+		return;
+	}
 
-  const int width = tile.size.x;
-  const int height = tile.size.y;
+	const int width = tile.size.x;
+	const int height = tile.size.y;
 
-  ccl::ImageSpec spec(width, height, 4, ccl::TypeDesc::FLOAT);
-  if (!image_output->open(filepath_, spec)) {
-    //log_("Failed to create image file");
-    return;
-  }
+	ccl::ImageSpec spec(width, height, 4, ccl::TypeDesc::FLOAT);
+	if(!image_output->open(filepath_, spec)) {
+		//log_("Failed to create image file");
+		return;
+	}
 
-  ccl::vector<float> pixels(width * height * 4);
-  if (!tile.get_pass_pixels(pass_, 4, pixels.data())) {
-    //log_("Failed to read render pass pixels");
-    return;
-  }
+	ccl::vector<float> pixels(width * height * 4);
+	if(!tile.get_pass_pixels(pass_, 4, pixels.data())) {
+		//log_("Failed to read render pass pixels");
+		return;
+	}
 
-  /* Manipulate offset and stride to convert from bottom-up to top-down convention. */
-  image_output->write_image(ccl::TypeDesc::FLOAT,
-                            pixels.data() + (height - 1) * width * 4,
-                            ccl::AutoStride,
-                            -width * 4 * sizeof(float),
-                            ccl::AutoStride);
-  image_output->close();
+	/* Manipulate offset and stride to convert from bottom-up to top-down convention. */
+	image_output->write_image(ccl::TypeDesc::FLOAT, pixels.data() + (height - 1) * width * 4, ccl::AutoStride, -width * 4 * sizeof(float), ccl::AutoStride);
+	image_output->close();
 }
 
 void unirender::cycles::Renderer::AddDebugSky()
@@ -1260,23 +1188,23 @@ void unirender::cycles::Renderer::AddDebugSky()
 	auto *shader = m_cclScene->default_background;
 	auto *graph = new ccl::ShaderGraph();
 
-	const ccl::NodeType *skyTexNodeType = ccl::NodeType::find(ccl::ustring{"sky_texture"});
-	auto skyTex = (ccl::SkyTextureNode*)skyTexNodeType->create(skyTexNodeType);
+	const ccl::NodeType *skyTexNodeType = ccl::NodeType::find(ccl::ustring {"sky_texture"});
+	auto skyTex = (ccl::SkyTextureNode *)skyTexNodeType->create(skyTexNodeType);
 	skyTex->set_owner(graph);
 	skyTex->set_sky_type(ccl::NodeSkyType::NODE_SKY_HOSEK);
-	skyTex->name = ccl::ustring{"tex"};
+	skyTex->name = ccl::ustring {"tex"};
 	graph->add(skyTex);
 
-	const ccl::NodeType *bgShaderNodeType = ccl::NodeType::find(ccl::ustring{"background_shader"});
+	const ccl::NodeType *bgShaderNodeType = ccl::NodeType::find(ccl::ustring {"background_shader"});
 	auto bgShader = (ccl::BackgroundNode *)bgShaderNodeType->create(bgShaderNodeType);
 	bgShader->set_owner(graph);
 	bgShader->set_strength(8.f);
-	bgShader->set_color({1.f,0.f,0.f});
-	bgShader->name = ccl::ustring{"bg"};
+	bgShader->set_color({1.f, 0.f, 0.f});
+	bgShader->name = ccl::ustring {"bg"};
 	graph->add(bgShader);
 
-	graph->connect(find_output_socket(*skyTex,"color"),find_input_socket(*bgShader,"color"));
-	graph->connect(find_output_socket(*bgShader,"background"),find_input_socket(*graph->output(),"surface"));
+	graph->connect(find_output_socket(*skyTex, "color"), find_input_socket(*bgShader, "color"));
+	graph->connect(find_output_socket(*bgShader, "background"), find_input_socket(*graph->output(), "surface"));
 
 	shader->set_graph(graph);
 	shader->tag_update(m_cclScene);
@@ -1284,23 +1212,23 @@ void unirender::cycles::Renderer::AddDebugSky()
 
 ccl::Mesh *unirender::cycles::Renderer::AddDebugMesh()
 {
-	auto *cclMesh = new ccl::Mesh{};
+	auto *cclMesh = new ccl::Mesh {};
 	m_cclScene->geometry.push_back(cclMesh);
 
 	cclMesh->name = "floor";
 	auto *mesh = cclMesh;
 	ccl::array<ccl::float3> P_array {};
-	P_array.push_back_slow(ccl::float3{-3.f,3.f,0.f});
-	P_array.push_back_slow(ccl::float3{3.f,3.f,0.f});
-	P_array.push_back_slow(ccl::float3{3.f,-3.f,0.f});
-	P_array.push_back_slow(ccl::float3{-3.f,-3.f,0.f});
+	P_array.push_back_slow(ccl::float3 {-3.f, 3.f, 0.f});
+	P_array.push_back_slow(ccl::float3 {3.f, 3.f, 0.f});
+	P_array.push_back_slow(ccl::float3 {3.f, -3.f, 0.f});
+	P_array.push_back_slow(ccl::float3 {-3.f, -3.f, 0.f});
 	mesh->set_verts(P_array);
 
 	size_t num_triangles = 0;
 	ccl::vector<int> nverts {};
 	nverts.push_back(4);
-	for (size_t i = 0; i < nverts.size(); i++)
-	num_triangles += nverts[i] - 2;
+	for(size_t i = 0; i < nverts.size(); i++)
+		num_triangles += nverts[i] - 2;
 	mesh->reserve_mesh(mesh->get_verts().size(), num_triangles);
 
 	/* create triangles */
@@ -1313,8 +1241,8 @@ ccl::Mesh *unirender::cycles::Renderer::AddDebugMesh()
 	verts.push_back(3);
 	int ishader = 0;
 	bool smooth = true;
-	for (size_t i = 0; i < nverts.size(); i++) {
-		for (int j = 0; j < nverts[i] - 2; j++) {
+	for(size_t i = 0; i < nverts.size(); i++) {
+		for(int j = 0; j < nverts[i] - 2; j++) {
 			int v0 = verts[index_offset];
 			int v1 = verts[index_offset + j + 1];
 			int v2 = verts[index_offset + j + 2];
@@ -1325,11 +1253,9 @@ ccl::Mesh *unirender::cycles::Renderer::AddDebugMesh()
 		index_offset += nverts[i];
 	}
 
-	if (mesh->need_attribute(m_cclScene, ccl::ATTR_STD_GENERATED)) {
+	if(mesh->need_attribute(m_cclScene, ccl::ATTR_STD_GENERATED)) {
 		ccl::Attribute *attr = mesh->attributes.add(ccl::ATTR_STD_GENERATED);
-		memcpy(
-			attr->data_float3(), mesh->get_verts().data(), sizeof(ccl::float3) * mesh->get_verts().size()
-		);
+		memcpy(attr->data_float3(), mesh->get_verts().data(), sizeof(ccl::float3) * mesh->get_verts().size());
 	}
 	return cclMesh;
 }
@@ -1345,64 +1271,64 @@ ccl::Object *unirender::cycles::Renderer::AddDebugObject()
 }
 void unirender::cycles::Renderer::AddDebugLight()
 {
-	auto *shader = new ccl::Shader{};
+	auto *shader = new ccl::Shader {};
 	shader->name = "point_shader";
 	ccl::ShaderGraph *graph = new ccl::ShaderGraph();
-	
-	const ccl::NodeType *emissionType = ccl::NodeType::find(ccl::ustring{"emission"});
+
+	const ccl::NodeType *emissionType = ccl::NodeType::find(ccl::ustring {"emission"});
 	auto emissionNode = (ccl::EmissionNode *)emissionType->create(emissionType);
 	emissionNode->set_owner(graph);
-	emissionNode->name = ccl::ustring{"emission"};
-	emissionNode->set_color(ccl::float3{0.8f,0.1f,0.1f} *100.f);
+	emissionNode->name = ccl::ustring {"emission"};
+	emissionNode->set_color(ccl::float3 {0.8f, 0.1f, 0.1f} * 100.f);
 	graph->add(emissionNode);
 
-	graph->connect( find_output_socket(*emissionNode,"emission"),find_input_socket(*graph->output(),"surface"));
-	
+	graph->connect(find_output_socket(*emissionNode, "emission"), find_input_socket(*graph->output(), "surface"));
+
 	shader->set_graph(graph);
 	shader->tag_update(m_cclScene);
 	m_cclScene->shaders.push_back(shader);
 
 	//
 
-	auto *light = new ccl::Light{};
+	auto *light = new ccl::Light {};
 	m_cclScene->lights.push_back(light);
 	light->set_light_type(ccl::LightType::LIGHT_POINT);
 	light->set_shader(shader);
 	light->set_size(1.f);
-	light->set_co({0.f,0.f,1.f});
+	light->set_co({0.f, 0.f, 1.f});
 }
 ccl::Shader *unirender::cycles::Renderer::AddDebugShader()
 {
-	auto *shader = new ccl::Shader{};
+	auto *shader = new ccl::Shader {};
 	shader->name = "shader_test";
 	ccl::ShaderGraph *graph = new ccl::ShaderGraph();
-	
-	const ccl::NodeType *nodeTypeGlossy = ccl::NodeType::find(ccl::ustring{"glossy_bsdf"});
+
+	const ccl::NodeType *nodeTypeGlossy = ccl::NodeType::find(ccl::ustring {"glossy_bsdf"});
 	auto glossyNode = (ccl::GlossyBsdfNode *)nodeTypeGlossy->create(nodeTypeGlossy);
 	glossyNode->set_owner(graph);
-	glossyNode->name = ccl::ustring{"floor_closure2"};
-	glossyNode->set(*find_type_input(*glossyNode,"roughness"),0.2f);
-	glossyNode->set(*find_type_input(*glossyNode,"distribution"),"beckmann");
+	glossyNode->name = ccl::ustring {"floor_closure2"};
+	glossyNode->set(*find_type_input(*glossyNode, "roughness"), 0.2f);
+	glossyNode->set(*find_type_input(*glossyNode, "distribution"), "beckmann");
 	graph->add(glossyNode);
 
-	const ccl::NodeType *nodeTypeCheckerTex = ccl::NodeType::find(ccl::ustring{"checker_texture"});
+	const ccl::NodeType *nodeTypeCheckerTex = ccl::NodeType::find(ccl::ustring {"checker_texture"});
 	auto checkerNode = (ccl::CheckerTextureNode *)nodeTypeCheckerTex->create(nodeTypeCheckerTex);
 	checkerNode->set_owner(graph);
-	checkerNode->name = ccl::ustring{"checker2"};
-	checkerNode->set(*find_type_input(*checkerNode,"color1"),ccl::float3{0.8f,0.8f,0.8f});
-	checkerNode->set(*find_type_input(*checkerNode,"color2"),ccl::float3{1.f,0.1f,0.1f});
+	checkerNode->name = ccl::ustring {"checker2"};
+	checkerNode->set(*find_type_input(*checkerNode, "color1"), ccl::float3 {0.8f, 0.8f, 0.8f});
+	checkerNode->set(*find_type_input(*checkerNode, "color2"), ccl::float3 {1.f, 0.1f, 0.1f});
 	graph->add(checkerNode);
-		
-	graph->connect( find_output_socket(*checkerNode,"color"),find_input_socket(*glossyNode,"color"));
-	graph->connect( find_output_socket(*glossyNode,"bsdf"),find_input_socket(*graph->output(),"surface"));
-	
+
+	graph->connect(find_output_socket(*checkerNode, "color"), find_input_socket(*glossyNode, "color"));
+	graph->connect(find_output_socket(*glossyNode, "bsdf"), find_input_socket(*graph->output(), "surface"));
+
 	shader->set_graph(graph);
 	shader->tag_update(m_cclScene);
 	m_cclScene->shaders.push_back(shader);
 	return shader;
 }
 
-void unirender::cycles::Renderer::InitializeDebugScene(const std::string &fileName,const std::vector<std::string> &xmlFileNames)
+void unirender::cycles::Renderer::InitializeDebugScene(const std::string &fileName, const std::vector<std::string> &xmlFileNames)
 {
 	Options opts {};
 
@@ -1425,22 +1351,20 @@ void unirender::cycles::Renderer::InitializeDebugScene(const std::string &fileNa
 	PopulateDebugScene();
 	for(auto &filepath : xmlFileNames)
 		ccl::xml_read_file(opts.scene, filepath.c_str());
-	
-	if (!opts.output_filepath.empty()) {
-		opts.session->set_output_driver(make_unique<COIIOOutputDriver>(
-		opts.output_filepath, opts.output_pass, session_print));
+
+	if(!opts.output_filepath.empty()) {
+		opts.session->set_output_driver(make_unique<COIIOOutputDriver>(opts.output_filepath, opts.output_pass, session_print));
 	}
 
-	opts.session->progress.set_update_callback([this]() {std::cout<<"Progress: "<<m_cclSession->progress.get_progress()<<","<<m_cclSession->progress.get_cancel_message()<<","<<m_cclSession->progress.get_error_message()<<std::endl;});
-	  
+	opts.session->progress.set_update_callback([this]() { std::cout << "Progress: " << m_cclSession->progress.get_progress() << "," << m_cclSession->progress.get_cancel_message() << "," << m_cclSession->progress.get_error_message() << std::endl; });
+
 	/* add pass for output. */
 	ccl::Pass *pass = opts.scene->create_node<ccl::Pass>();
 	pass->set_name(ccl::ustring(opts.output_pass.c_str()));
 	pass->set_type(ccl::PASS_COMBINED);
 
 	auto useOptix = false;
-	if(useOptix)
-	{
+	if(useOptix) {
 		using namespace ccl;
 		auto devices = ccl::Device::available_devices(DEVICE_MASK(ccl::DeviceType::DEVICE_OPTIX));
 		opts.session_params.device = devices.front();
@@ -1471,15 +1395,15 @@ void unirender::cycles::Renderer::PopulateDebugScene()
 	mesh->set_used_shaders(used_shaders);
 }
 
-bool unirender::cycles::Renderer::BeginSceneEdit() {return true;}
-bool unirender::cycles::Renderer::EndSceneEdit() {return true;}
+bool unirender::cycles::Renderer::BeginSceneEdit() { return true; }
+bool unirender::cycles::Renderer::EndSceneEdit() { return true; }
 bool unirender::cycles::Renderer::AddLiveActor(unirender::WorldObject &actor)
 {
-	auto *pLight = dynamic_cast<unirender::Light*>(&actor);
+	auto *pLight = dynamic_cast<unirender::Light *>(&actor);
 	if(!pLight)
 		return false;
 	GetScene().AddLight(*pLight);
-	SyncLight(*m_scene,*pLight);
+	SyncLight(*m_scene, *pLight);
 	auto it = m_lightToShader.find(pLight);
 	if(it == m_lightToShader.end())
 		return false;
@@ -1493,45 +1417,40 @@ bool unirender::cycles::Renderer::SyncEditedActor(const util::Uuid &uuid)
 	if(!actor)
 		return false;
 	if(typeid(*actor) == typeid(Camera))
-		SyncCamera(static_cast<Camera&>(*actor),true);
+		SyncCamera(static_cast<Camera &>(*actor), true);
 	else if(typeid(*actor) == typeid(Light))
-		SyncLight(*m_scene,static_cast<Light&>(*actor),true);
-	else if(typeid(*actor) == typeid(Object))
-	{
-		auto &o = *static_cast<Object*>(actor);
+		SyncLight(*m_scene, static_cast<Light &>(*actor), true);
+	else if(typeid(*actor) == typeid(Object)) {
+		auto &o = *static_cast<Object *>(actor);
 		auto it = m_uuidToObject.find(util::uuid_to_string(o.GetUuid()));
-		if(it != m_uuidToObject.end())
-		{
+		if(it != m_uuidToObject.end()) {
 			auto it2 = m_objectToCclObject.find(it->second);
-			if(it2 != m_objectToCclObject.end())
-			{
+			if(it2 != m_objectToCclObject.end()) {
 				auto &cclObjInfo = it2->second;
 				auto *cclObj = cclObjInfo.object;
 				auto *geo = cclObj->get_geometry();
-				if(geo && geo->transform_applied)
-				{
+				if(geo && geo->transform_applied) {
 					// Transforms have already been applied; Restore original vertices
 					// and apply new transforms
-					auto *cclMesh = static_cast<ccl::Mesh*>(geo);
+					auto *cclMesh = static_cast<ccl::Mesh *>(geo);
 					auto *mesh = m_cclMeshToMesh.find(cclMesh)->second;
 					auto &verts = mesh->GetVertices();
 					auto &cclVerts = cclMesh->get_verts();
-					for(auto i=decltype(verts.size()){0u};i<verts.size();++i)
+					for(auto i = decltype(verts.size()) {0u}; i < verts.size(); ++i)
 						cclVerts[i] = ToCyclesPosition(verts[i]);
 
 					auto lastPose = cclObjInfo.lastUpdatePose;
 					cclObjInfo.lastUpdatePose = o.GetPose();
 					auto cclPose = ToCyclesTransform(o.GetPose());
-					geo->apply_transform(cclPose,false);
+					geo->apply_transform(cclPose, false);
 					geo->transform_normal = transform_transposed_inverse(cclPose);
 
-					cclObj->set_tfm(ToCyclesTransform(o.GetPose(),true));
+					cclObj->set_tfm(ToCyclesTransform(o.GetPose(), true));
 					cclObj->tag_tfm_modified();
 					cclObj->tag_update(m_cclScene);
 				}
-				else
-				{
-					cclObj->set_tfm(ToCyclesTransform(o.GetPose(),true));
+				else {
+					cclObj->set_tfm(ToCyclesTransform(o.GetPose(), true));
 					cclObj->tag_tfm_modified();
 					cclObj->tag_update(m_cclScene);
 				}
@@ -1540,20 +1459,19 @@ bool unirender::cycles::Renderer::SyncEditedActor(const util::Uuid &uuid)
 	}
 	else
 		return false;
-	umath::set_flag(m_stateFlags,StateFlags::ReloadSessionScheduled);
+	umath::set_flag(m_stateFlags, StateFlags::ReloadSessionScheduled);
 	return true;
 }
 
-bool unirender::cycles::Renderer::Initialize(unirender::Scene &scene,std::string &outErr)
+bool unirender::cycles::Renderer::Initialize(unirender::Scene &scene, std::string &outErr)
 {
-	auto devInfo = InitializeDevice(scene,outErr);
+	auto devInfo = InitializeDevice(scene, outErr);
 	if(devInfo.has_value() == false)
 		return false;
 
 	auto apiData = GetApiData();
 	auto udmDebugStandalone = apiData.GetFromPath("cycles/debug/debugStandalone");
-	if(udmDebugStandalone)
-	{
+	if(udmDebugStandalone) {
 		std::string xmlFile;
 		udmDebugStandalone["xmlFile"](xmlFile);
 
@@ -1566,60 +1484,44 @@ bool unirender::cycles::Renderer::Initialize(unirender::Scene &scene,std::string
 		std::string deviceName = "CPU";
 		udmDebugStandalone["device"](deviceName);
 
-		std::cout<<"Selected device: "<<deviceName<<std::endl;
+		std::cout << "Selected device: " << deviceName << std::endl;
 		auto strSamples = std::to_string(samples);
-		const char *args[] = {
-			"",
-			xmlFile.c_str(),
-			"--output",
-			outputFile.c_str(),
-			"--samples",
-			strSamples.c_str(),
-			"--device",
-			deviceName.c_str(),
-			"--background"
-		}; 
-		cycles_standalone_test(9,args,false);
+		const char *args[] = {"", xmlFile.c_str(), "--output", outputFile.c_str(), "--samples", strSamples.c_str(), "--device", deviceName.c_str(), "--background"};
+		cycles_standalone_test(9, args, false);
 		return false;
 	}
 
 	auto nativeDenoising = false;
 	auto udmDebug = apiData.GetFromPath("cycles/debug");
 	udmDebug["nativeDenoising"](nativeDenoising);
-	umath::set_flag(m_stateFlags,StateFlags::NativeDenoising,nativeDenoising);
-	
+	umath::set_flag(m_stateFlags, StateFlags::NativeDenoising, nativeDenoising);
+
 	auto denoiserType = ccl::DenoiserType::DENOISER_NONE;
-	if(!umath::is_flag_set(m_stateFlags,StateFlags::NativeDenoising))
-	{
+	if(!umath::is_flag_set(m_stateFlags, StateFlags::NativeDenoising)) {
 		auto denoiseMode = m_scene->GetDenoiseMode();
 		std::vector<ccl::DenoiserType> denoisePreferenceOrder;
-		if(denoiseMode == Scene::DenoiseMode::AutoFast || denoiseMode == Scene::DenoiseMode::AutoDetailed || denoiseMode == Scene::DenoiseMode::Optix)
-		{
+		if(denoiseMode == Scene::DenoiseMode::AutoFast || denoiseMode == Scene::DenoiseMode::AutoDetailed || denoiseMode == Scene::DenoiseMode::Optix) {
 			denoisePreferenceOrder.push_back(ccl::DenoiserType::DENOISER_OPTIX);
 			denoisePreferenceOrder.push_back(ccl::DenoiserType::DENOISER_OPENIMAGEDENOISE);
 		}
-		else if(denoiseMode == Scene::DenoiseMode::OpenImage)
-		{
+		else if(denoiseMode == Scene::DenoiseMode::OpenImage) {
 			denoisePreferenceOrder.push_back(ccl::DenoiserType::DENOISER_OPENIMAGEDENOISE);
 			denoisePreferenceOrder.push_back(ccl::DenoiserType::DENOISER_OPTIX);
 		}
-	
+
 		auto availableDenoisers = devInfo->denoisers;
-		for(auto type : denoisePreferenceOrder)
-		{
-			if((availableDenoisers &type) != 0)
-			{
+		for(auto type : denoisePreferenceOrder) {
+			if((availableDenoisers & type) != 0) {
 				denoiserType = type;
 				break;
 			}
 		}
 
 		if(denoiserType == ccl::DenoiserType::DENOISER_NONE && denoiseMode != Scene::DenoiseMode::None)
-			umath::set_flag(m_stateFlags,StateFlags::NativeDenoising); // No Cycles denoising available; Fall back to native denoising
+			umath::set_flag(m_stateFlags, StateFlags::NativeDenoising); // No Cycles denoising available; Fall back to native denoising
 	}
 
-	switch(scene.GetRenderMode())
-	{
+	switch(scene.GetRenderMode()) {
 	case unirender::Scene::RenderMode::SceneAlbedo:
 		AddOutput(OUTPUT_ALBEDO);
 		break;
@@ -1643,33 +1545,30 @@ bool unirender::cycles::Renderer::Initialize(unirender::Scene &scene,std::string
 		AddOutput(OUTPUT_DIFFUSE_INDIRECT);
 		break;
 	case unirender::Scene::RenderMode::RenderImage:
-	{
-		AddOutput(OUTPUT_COLOR);
-		if(umath::is_flag_set(m_stateFlags,StateFlags::NativeDenoising))
 		{
-			AddOutput(OUTPUT_ALBEDO);
-			AddOutput(OUTPUT_NORMAL);
+			AddOutput(OUTPUT_COLOR);
+			if(umath::is_flag_set(m_stateFlags, StateFlags::NativeDenoising)) {
+				AddOutput(OUTPUT_ALBEDO);
+				AddOutput(OUTPUT_NORMAL);
+			}
+			break;
 		}
-		break;
-	}
 	default:
 		return false;
 	}
 
-	InitializeSession(scene,*devInfo);
+	InitializeSession(scene, *devInfo);
 	auto &createInfo = scene.GetCreateInfo();
 	auto bufferParams = GetBufferParameters();
 
 	if(denoiserType == ccl::DenoiserType::DENOISER_NONE)
 		m_cclScene->integrator->set_use_denoise(false);
-	else
-	{
+	else {
 		m_cclScene->integrator->set_use_denoise(true);
 		m_cclScene->integrator->set_denoiser_type(denoiserType);
 		m_cclScene->integrator->set_denoise_start_sample(1);
 		// m_cclScene->integrator->set_denoiser_prefilter(ccl::DenoiserPrefilter::DENOISER_PREFILTER_FAST);
-		if(umath::is_flag_set(m_flags,Flags::EnableLiveEditing))
-		{
+		if(umath::is_flag_set(m_flags, Flags::EnableLiveEditing)) {
 			m_cclScene->integrator->set_use_denoise_pass_albedo(true);
 			m_cclScene->integrator->set_use_denoise_pass_normal(false);
 		}
@@ -1679,40 +1578,37 @@ bool unirender::cycles::Renderer::Initialize(unirender::Scene &scene,std::string
 	auto renderDebugScene = false;
 	auto udmDebugScene = apiData.GetFromPath("cycles/debug/debugScene");
 	udmDebugScene["enabled"](renderDebugScene);
-	if(renderDebugScene)
-	{
+	if(renderDebugScene) {
 		std::string outputFileName;
-		if(!udmDebugScene["outputFileName"](outputFileName))
-		{
+		if(!udmDebugScene["outputFileName"](outputFileName)) {
 			outputFileName = "temp/cycles/";
 			filemanager::create_path(outputFileName);
-			outputFileName = util::get_program_path() +'/' +outputFileName +"debug_scene.png";
+			outputFileName = util::get_program_path() + '/' + outputFileName + "debug_scene.png";
 		}
 		std::vector<std::string> xmlFiles;
 		udmDebugScene["xmlFiles"](xmlFiles);
-		InitializeDebugScene(outputFileName,xmlFiles);
+		InitializeDebugScene(outputFileName, xmlFiles);
 		return false;
 	}
 
 	m_sessionParams = m_cclSession->params;
 	m_bufferParams = bufferParams;
-	m_cclSession->reset(m_sessionParams,m_bufferParams);
+	m_cclSession->reset(m_sessionParams, m_bufferParams);
 
 	if(m_scene->GetSceneInfo().sky.empty() == false)
 		AddSkybox(m_scene->GetSceneInfo().sky);
-	umath::set_flag(m_stateFlags,StateFlags::RenderingStarted);
-	
+	umath::set_flag(m_stateFlags, StateFlags::RenderingStarted);
+
 	auto &mdlCache = m_renderData.modelCache;
 	mdlCache->GenerateData();
 	uint32_t numObjects = 0;
 	uint32_t numMeshes = 0;
-	for(auto &chunk : mdlCache->GetChunks())
-	{
+	for(auto &chunk : mdlCache->GetChunks()) {
 		numObjects += chunk.GetObjects().size();
 		numMeshes += chunk.GetMeshes().size();
 	}
-	m_cclScene->objects.reserve(m_cclScene->objects.size() +numObjects);
-	m_cclScene->geometry.reserve(m_cclScene->geometry.size() +numMeshes);
+	m_cclScene->objects.reserve(m_cclScene->objects.size() + numObjects);
+	m_cclScene->geometry.reserve(m_cclScene->geometry.size() + numMeshes);
 
 	auto &cam = scene.GetCamera();
 	SyncCamera(cam);
@@ -1721,32 +1617,27 @@ bool unirender::cycles::Renderer::Initialize(unirender::Scene &scene,std::string
 	auto udmDebugLight = apiData.GetFromPath("cycles/debug/debug_light")(addDebugLight);
 	if(addDebugLight)
 		AddDebugLight();
-	else
-	{
+	else {
 		// Note: Lights and objects have to be initialized before shaders, because they may
 		// create additional shaders.
 		auto &lights = scene.GetLights();
 		m_cclScene->lights.reserve(lights.size());
-		for(auto &light : lights)
-		{
+		for(auto &light : lights) {
 			light->Finalize(scene);
-			SyncLight(scene,*light);
+			SyncLight(scene, *light);
 		}
 	}
-	for(auto &chunk : mdlCache->GetChunks())
-	{
+	for(auto &chunk : mdlCache->GetChunks()) {
 		for(auto &o : chunk.GetObjects())
 			o->Finalize(*m_scene);
 		for(auto &o : chunk.GetMeshes())
 			o->Finalize(*m_scene);
 	}
-	for(auto &chunk : mdlCache->GetChunks())
-	{
+	for(auto &chunk : mdlCache->GetChunks()) {
 		for(auto &o : chunk.GetMeshes())
 			SyncMesh(*o);
 	}
-	for(auto &chunk : mdlCache->GetChunks())
-	{
+	for(auto &chunk : mdlCache->GetChunks()) {
 		for(auto &o : chunk.GetObjects())
 			SyncObject(*o);
 	}
@@ -1757,74 +1648,65 @@ bool unirender::cycles::Renderer::Initialize(unirender::Scene &scene,std::string
 	UpdateActorMap();
 
 	constexpr auto validate = false;
-	if constexpr(validate)
-	{
-		for(auto &chunk : m_renderData.modelCache->GetChunks())
-		{
-			for(auto &o : chunk.GetObjects())
-			{
+	if constexpr(validate) {
+		for(auto &chunk : m_renderData.modelCache->GetChunks()) {
+			for(auto &o : chunk.GetObjects()) {
 				auto &mesh = o->GetMesh();
 				mesh.Validate();
 			}
 		}
 	}
-	
+
 	// TODO: Move this to shared code
-	if(createInfo.colorTransform.has_value())
-	{
+	if(createInfo.colorTransform.has_value()) {
 		std::string err;
 		ColorTransformProcessorCreateInfo ctpCreateInfo {};
 		ctpCreateInfo.config = createInfo.colorTransform->config;
 		ctpCreateInfo.lookName = createInfo.colorTransform->lookName;
 		ctpCreateInfo.bitDepth = ColorTransformProcessorCreateInfo::BitDepth::Float16;
-		m_colorTransformProcessor = create_color_transform_processor(ctpCreateInfo,err,0.f,m_scene->GetGamma());
+		m_colorTransformProcessor = create_color_transform_processor(ctpCreateInfo, err, 0.f, m_scene->GetGamma());
 		if(m_colorTransformProcessor == nullptr)
-			m_scene->HandleError("Unable to initialize color transform processor: " +err);
+			m_scene->HandleError("Unable to initialize color transform processor: " + err);
 	}
 
 	auto &sceneInfo = m_scene->GetSceneInfo();
-	if(/*createInfo.progressive && */GetTileSize() > 0)
-	{
+	if(/*createInfo.progressive && */ GetTileSize() > 0) {
 		auto w = m_cclScene->camera->get_full_width();
 		auto h = m_cclScene->camera->get_full_height();
-		m_tileManager.Initialize(w,h,GetTileSize(),GetTileSize(),m_deviceType == Scene::DeviceType::CPU,createInfo.exposure,m_scene->GetGamma(),m_colorTransformProcessor.get());
+		m_tileManager.Initialize(w, h, GetTileSize(), GetTileSize(), m_deviceType == Scene::DeviceType::CPU, createInfo.exposure, m_scene->GetGamma(), m_colorTransformProcessor.get());
 		bool flipHorizontally = true;
-		if(m_cclScene->camera->get_camera_type() == ccl::CameraType::CAMERA_PANORAMA)
-		{
-			switch(m_cclScene->camera->get_panorama_type())
-			{
+		if(m_cclScene->camera->get_camera_type() == ccl::CameraType::CAMERA_PANORAMA) {
+			switch(m_cclScene->camera->get_panorama_type()) {
 			case ccl::PanoramaType::PANORAMA_EQUIRECTANGULAR:
 			case ccl::PanoramaType::PANORAMA_FISHEYE_EQUIDISTANT:
 				flipHorizontally = false; // I have no idea why some types have to be flipped and others don't
 				break;
 			}
 		}
-		m_tileManager.SetFlipImage(flipHorizontally,true);
+		m_tileManager.SetFlipImage(flipHorizontally, true);
 		m_tileManager.SetExposure(sceneInfo.exposure);
 	}
 
-	std::vector<std::pair<std::string,uimg::Format>> passes;
+	std::vector<std::pair<std::string, uimg::Format>> passes;
 	passes.reserve(m_outputs.size());
 	for(auto &pair : m_outputs)
-		passes.push_back({pair.first,uimg::Format::RGBA32});
+		passes.push_back({pair.first, uimg::Format::RGBA32});
 
-	if(m_scene->HasBakeTarget() && !InitializeBakingData())
-	{
+	if(m_scene->HasBakeTarget() && !InitializeBakingData()) {
 		outErr = "Failed to initialize bake data.";
 		return false;
 	}
 
-	Vector2i tileSize {cam.GetWidth(),cam.GetHeight()};
+	Vector2i tileSize {cam.GetWidth(), cam.GetHeight()};
 	if(m_cclSession->params.use_auto_tile)
-		tileSize = {m_cclSession->params.tile_size,m_cclSession->params.tile_size};
-	auto outputDriver = std::make_unique<OutputDriver>(passes,cam.GetWidth(),cam.GetHeight());
+		tileSize = {m_cclSession->params.tile_size, m_cclSession->params.tile_size};
+	auto outputDriver = std::make_unique<OutputDriver>(passes, cam.GetWidth(), cam.GetHeight());
 	if(m_bakeData)
-		static_cast<OutputDriver&>(*outputDriver).SetBakeData(*m_bakeData);
+		static_cast<OutputDriver &>(*outputDriver).SetBakeData(*m_bakeData);
 	m_outputDriver = outputDriver.get();
-	if(IsDisplayDriverEnabled() && !m_bakeData)
-	{
-		auto displayDriver = std::make_unique<DisplayDriver>(m_tileManager,cam.GetWidth(),cam.GetHeight());
-		displayDriver->UpdateTileResolution(tileSize.x,tileSize.y);
+	if(IsDisplayDriverEnabled() && !m_bakeData) {
+		auto displayDriver = std::make_unique<DisplayDriver>(m_tileManager, cam.GetWidth(), cam.GetHeight());
+		displayDriver->UpdateTileResolution(tileSize.x, tileSize.y);
 		m_displayDriver = displayDriver.get();
 		m_cclSession->set_display_driver(std::move(displayDriver));
 	}
@@ -1832,23 +1714,19 @@ bool unirender::cycles::Renderer::Initialize(unirender::Scene &scene,std::string
 
 	//
 
-	if(scene.GetRenderMode() == Scene::RenderMode::BakeAmbientOcclusion)
-	{
+	if(scene.GetRenderMode() == Scene::RenderMode::BakeAmbientOcclusion) {
 		m_cclScene->integrator->set_use_direct_light(false);
 		m_cclScene->integrator->set_use_indirect_light(false);
 		m_cclScene->background->set_transparent(true);
 	}
-	if(
-		Scene::IsLightmapRenderMode(scene.GetRenderMode()) ||
-		scene.GetRenderMode() == Scene::RenderMode::BakeNormals
-	)
+	if(Scene::IsLightmapRenderMode(scene.GetRenderMode()) || scene.GetRenderMode() == Scene::RenderMode::BakeNormals)
 		m_cclScene->background->set_transparent(true);
 	if(ShouldUseTransparentSky())
 		m_cclScene->background->set_transparent(true);
 
 	auto *bakeTarget = m_scene->GetBakeTargetName();
 	if(bakeTarget)
-		m_cclScene->bake_manager->set(m_cclScene,*bakeTarget);
+		m_cclScene->bake_manager->set(m_cclScene, *bakeTarget);
 
 #if 0
 	{
@@ -1895,22 +1773,19 @@ bool unirender::cycles::Renderer::Initialize(unirender::Scene &scene,std::string
 	return true;
 }
 
-void unirender::cycles::Renderer::InitializePassShaders(const std::function<std::shared_ptr<GroupNodeDesc>(const Shader&)> &fGetPassDesc)
+void unirender::cycles::Renderer::InitializePassShaders(const std::function<std::shared_ptr<GroupNodeDesc>(const Shader &)> &fGetPassDesc)
 {
-	std::unordered_map<Shader*,std::shared_ptr<CCLShader>> shaderCache;
-	for(auto &chunk : m_renderData.modelCache->GetChunks())
-	{
-		for(auto &o : chunk.GetObjects())
-		{
+	std::unordered_map<Shader *, std::shared_ptr<CCLShader>> shaderCache;
+	for(auto &chunk : m_renderData.modelCache->GetChunks()) {
+		for(auto &o : chunk.GetObjects()) {
 			auto &mesh = o->GetMesh();
 			auto *cclMesh = FindCclMesh(mesh);
 			if(cclMesh == nullptr)
 				continue;
 			auto &subMeshShaders = mesh.GetSubMeshShaders();
 			auto numShaders = subMeshShaders.size();
-			std::unordered_map<uint32_t,uint32_t> oldShaderIndexToNewIndex {};
-			for(auto i=decltype(numShaders){0u};i<numShaders;++i)
-			{
+			std::unordered_map<uint32_t, uint32_t> oldShaderIndexToNewIndex {};
+			for(auto i = decltype(numShaders) {0u}; i < numShaders; ++i) {
 				auto &shader = subMeshShaders.at(i);
 				auto albedoPass = fGetPassDesc(*shader);
 				if(albedoPass == nullptr)
@@ -1920,15 +1795,14 @@ void unirender::cycles::Renderer::InitializePassShaders(const std::function<std:
 				auto it = shaderCache.find(shader.get());
 				if(it != shaderCache.end())
 					cclShader = it->second;
-				else
-				{
-					cclShader = CCLShader::Create(*this,*albedoPass);
+				else {
+					cclShader = CCLShader::Create(*this, *albedoPass);
 					cclShader->Finalize(*m_scene);
 					shaderCache[shader.get()] = cclShader;
 				}
 				cclMesh->get_used_shaders()[i] = **cclShader;
 			}
-			cclMesh->tag_update(m_cclScene,false);
+			cclMesh->tag_update(m_cclScene, false);
 		}
 	}
 }
@@ -1938,20 +1812,19 @@ void unirender::cycles::Renderer::InitializeAlbedoPass(bool reloadShaders)
 	auto bufferParams = GetBufferParameters();
 	uint32_t sampleCount = 1;
 	auto &createInfo = m_scene->GetCreateInfo();
-	if(createInfo.progressive)
-	{
+	if(createInfo.progressive) {
 		// TODO: We should only need one sample, but for whatever reason some tiles will not get rendered properly if the sample count is too low. The reason for this is unknown
 		// UPDATE: This should be fixed now, so this line should no longer be needed!
 		sampleCount = 4;
 	}
 	m_cclSession->params.samples = sampleCount;
-	m_cclSession->reset(m_cclSession->params,bufferParams); // We only need the normals and albedo colors for the first sample
+	m_cclSession->reset(m_cclSession->params, bufferParams); // We only need the normals and albedo colors for the first sample
 
 	m_cclScene->lights.clear();
 
 	if(reloadShaders == false)
 		return;
-	InitializePassShaders([](const Shader &shader) -> std::shared_ptr<GroupNodeDesc> {return shader.albedoPass;});
+	InitializePassShaders([](const Shader &shader) -> std::shared_ptr<GroupNodeDesc> { return shader.albedoPass; });
 #if 0
 	// Note: For denoising the scene has to be rendered three times:
 	// 1) With lighting
@@ -2027,34 +1900,33 @@ void unirender::cycles::Renderer::InitializeNormalPass(bool reloadShaders)
 	auto bufferParams = GetBufferParameters();
 	uint32_t sampleCount = 1;
 	auto &createInfo = m_scene->GetCreateInfo();
-	if(createInfo.progressive)
-	{
+	if(createInfo.progressive) {
 		// TODO: We should only need one sample, but for whatever reason some tiles will not get rendered properly if the sample count is too low. The reason for this is unknown
 		// UPDATE: This should be fixed now, so this line should no longer be needed!
 		sampleCount = 4;
 	}
 	m_cclSession->params.samples = sampleCount;
-	m_cclSession->reset(m_cclSession->params,bufferParams); // We only need the normals and albedo colors for the first sample
+	m_cclSession->reset(m_cclSession->params, bufferParams); // We only need the normals and albedo colors for the first sample
 
 	// Disable the sky (by making it black)
 	auto shader = unirender::GroupNodeDesc::Create(m_scene->GetShaderNodeManager());
 
 	auto &nodeOutput = shader->AddNode(NODE_OUTPUT);
 	auto &nodeBg = shader->AddNode(NODE_BACKGROUND_SHADER);
-	nodeBg.SetProperty(nodes::background_shader::IN_STRENGTH,0.f);
+	nodeBg.SetProperty(nodes::background_shader::IN_STRENGTH, 0.f);
 
-	auto col = shader->CombineRGB(0.f,0.f,0.f);
-	shader->Link(col,nodeBg.GetInputSocket(nodes::background_shader::IN_COLOR));
-	shader->Link(nodeBg,nodes::background_shader::OUT_BACKGROUND,nodeOutput,nodes::output::IN_SURFACE);
+	auto col = shader->CombineRGB(0.f, 0.f, 0.f);
+	shader->Link(col, nodeBg.GetInputSocket(nodes::background_shader::IN_COLOR));
+	shader->Link(nodeBg, nodes::background_shader::OUT_BACKGROUND, nodeOutput, nodes::output::IN_SURFACE);
 
-	auto cclShader = CCLShader::Create(*this,*shader);
+	auto cclShader = CCLShader::Create(*this, *shader);
 	cclShader->Finalize(*m_scene);
 	m_cclScene->default_background = **cclShader;
 	(*cclShader)->tag_update(m_cclScene);
 
 	if(reloadShaders == false)
 		return;
-	InitializePassShaders([](const Shader &shader) -> std::shared_ptr<GroupNodeDesc> {return shader.normalPass;});
+	InitializePassShaders([](const Shader &shader) -> std::shared_ptr<GroupNodeDesc> { return shader.normalPass; });
 #if 0
 	// Note: For denoising the scene has to be rendered three times:
 	// 1) With lighting
@@ -2110,11 +1982,11 @@ std::shared_ptr<unirender::CCLShader> unirender::cycles::Renderer::GetCachedShad
 	return m_cclShaders.at(idx);
 }
 
-void unirender::cycles::Renderer::AddShader(CCLShader &shader,const GroupNodeDesc *optDesc)
+void unirender::cycles::Renderer::AddShader(CCLShader &shader, const GroupNodeDesc *optDesc)
 {
 	m_cclShaders.push_back(shader.shared_from_this());
 	if(optDesc)
-		m_shaderCache[optDesc] = m_cclShaders.size() -1;
+		m_shaderCache[optDesc] = m_cclShaders.size() - 1;
 }
 
 void unirender::cycles::Renderer::Reset()
@@ -2133,7 +2005,7 @@ void unirender::cycles::Renderer::Restart()
 	m_cclSession->start();
 	m_restartState = 2;
 }
-std::optional<std::string> unirender::cycles::Renderer::SaveRenderPreview(const std::string &path,std::string &outErr) const
+std::optional<std::string> unirender::cycles::Renderer::SaveRenderPreview(const std::string &path, std::string &outErr) const
 {
 	outErr = "Saving render preview not implemented for cycles.";
 	return {};
@@ -2141,22 +2013,21 @@ std::optional<std::string> unirender::cycles::Renderer::SaveRenderPreview(const 
 
 void unirender::cycles::Renderer::AddSkybox(const std::string &texture)
 {
-	if(umath::is_flag_set(m_stateFlags,StateFlags::SkyInitialized))
+	if(umath::is_flag_set(m_stateFlags, StateFlags::SkyInitialized))
 		return;
-	umath::set_flag(m_stateFlags,StateFlags::SkyInitialized);
+	umath::set_flag(m_stateFlags, StateFlags::SkyInitialized);
 
-	if(m_renderMode == Scene::RenderMode::SceneDepth)
-	{
+	if(m_renderMode == Scene::RenderMode::SceneDepth) {
 		auto desc = unirender::GroupNodeDesc::Create(m_scene->GetShaderNodeManager());
 		auto &nodeOutput = desc->AddNode(NODE_OUTPUT);
 		auto &nodeBg = desc->AddNode(NODE_BACKGROUND_SHADER);
-		nodeBg.SetProperty(nodes::background_shader::IN_STRENGTH,1'000.f);
+		nodeBg.SetProperty(nodes::background_shader::IN_STRENGTH, 1'000.f);
 
-		auto col = desc->CombineRGB(1.f,1.f,1.f);
-		desc->Link(col,nodeBg.GetInputSocket(nodes::background_shader::IN_COLOR));
-		desc->Link(nodeBg,nodes::background_shader::OUT_BACKGROUND,nodeOutput,nodes::output::IN_SURFACE);
-		
-		AddShader(*CCLShader::Create(*this,*m_cclScene->default_background,*desc));
+		auto col = desc->CombineRGB(1.f, 1.f, 1.f);
+		desc->Link(col, nodeBg.GetInputSocket(nodes::background_shader::IN_COLOR));
+		desc->Link(nodeBg, nodes::background_shader::OUT_BACKGROUND, nodeOutput, nodes::output::IN_SURFACE);
+
+		AddShader(*CCLShader::Create(*this, *m_cclScene->default_background, *desc));
 		return;
 	}
 
@@ -2172,31 +2043,27 @@ void unirender::cycles::Renderer::AddSkybox(const std::string &texture)
 	auto desc = unirender::GroupNodeDesc::Create(m_scene->GetShaderNodeManager());
 	auto &nodeOutput = desc->AddNode(NODE_OUTPUT);
 	auto &nodeBg = desc->AddNode(NODE_BACKGROUND_SHADER);
-	nodeBg.SetProperty(nodes::background_shader::IN_STRENGTH,sceneInfo.skyStrength);
-	
-	auto &nodeTex = desc->AddImageTextureNode(*absPath,TextureType::EquirectangularImage);
-	desc->Link(nodeTex,nodes::environment_texture::OUT_COLOR,nodeBg,nodes::background_shader::IN_COLOR);
-	desc->Link(nodeBg,nodes::background_shader::OUT_BACKGROUND,nodeOutput,nodes::output::IN_SURFACE);
+	nodeBg.SetProperty(nodes::background_shader::IN_STRENGTH, sceneInfo.skyStrength);
+
+	auto &nodeTex = desc->AddImageTextureNode(*absPath, TextureType::EquirectangularImage);
+	desc->Link(nodeTex, nodes::environment_texture::OUT_COLOR, nodeBg, nodes::background_shader::IN_COLOR);
+	desc->Link(nodeBg, nodes::background_shader::OUT_BACKGROUND, nodeOutput, nodes::output::IN_SURFACE);
 
 	auto skyAngles = sceneInfo.skyAngles;
 	// skyAngles.p -= 90.f;
-	skyAngles = {
-		-skyAngles.p,
-		skyAngles.r,
-		-skyAngles.y
-	};
+	skyAngles = {-skyAngles.p, skyAngles.r, -skyAngles.y};
 
 	auto &nodeTexCoord = desc->AddNode(NODE_TEXTURE_COORDINATE);
 	auto &nodeMapping = desc->AddNode(NODE_MAPPING);
-	nodeMapping.SetProperty(nodes::mapping::IN_TYPE,ccl::NodeMappingType::NODE_MAPPING_TYPE_POINT);
-	nodeMapping.SetProperty(nodes::mapping::IN_ROTATION,skyAngles);
-	desc->Link(nodeTexCoord,nodes::texture_coordinate::OUT_GENERATED,nodeMapping,nodes::mapping::IN_VECTOR);
+	nodeMapping.SetProperty(nodes::mapping::IN_TYPE, ccl::NodeMappingType::NODE_MAPPING_TYPE_POINT);
+	nodeMapping.SetProperty(nodes::mapping::IN_ROTATION, skyAngles);
+	desc->Link(nodeTexCoord, nodes::texture_coordinate::OUT_GENERATED, nodeMapping, nodes::mapping::IN_VECTOR);
 
-	desc->Link(nodeMapping,nodes::mapping::OUT_VECTOR,nodeTex,nodes::environment_texture::IN_VECTOR);
-	AddShader(*CCLShader::Create(*this,*m_cclScene->default_background,*desc));
+	desc->Link(nodeMapping, nodes::mapping::OUT_VECTOR, nodeTex, nodes::environment_texture::IN_VECTOR);
+	AddShader(*CCLShader::Create(*this, *m_cclScene->default_background, *desc));
 
 	// Add the light source for the background
-	auto *light = new ccl::Light{}; // Object will be removed automatically by cycles
+	auto *light = new ccl::Light {}; // Object will be removed automatically by cycles
 	light->set_tfm(ccl::transform_identity());
 
 	m_cclScene->lights.push_back(light);
@@ -2211,8 +2078,8 @@ void unirender::cycles::Renderer::AddSkybox(const std::string &texture)
 util::ParallelJob<uimg::ImageLayerSet> unirender::cycles::Renderer::StartRender()
 {
 	auto job = util::create_parallel_job<RenderWorker>(*this);
-	auto &worker = static_cast<RenderWorker&>(job.GetWorker());
-	StartNextRenderStage(worker,ImageRenderStage::InitializeScene,StereoEye::None);
+	auto &worker = static_cast<RenderWorker &>(job.GetWorker());
+	StartNextRenderStage(worker, ImageRenderStage::InitializeScene, StereoEye::None);
 	return job;
 }
 #if 0
@@ -2260,10 +2127,10 @@ void unirender::cycles::Renderer::WriteRenderTile(unirender::TileManager &tileMa
 #define DLLEXPORT __declspec(dllexport)
 #endif
 extern "C" {
-	bool DLLEXPORT create_renderer(const unirender::Scene &scene,unirender::Renderer::Flags flags,std::shared_ptr<unirender::Renderer> &outRenderer,std::string &outErr)
-	{
-		unirender::Scene::SetKernelPath(util::get_program_path() +"/modules/unirender/cycles");
-		outRenderer = unirender::cycles::Renderer::Create(scene,outErr,flags);
-		return outRenderer != nullptr;
-	}
+bool DLLEXPORT create_renderer(const unirender::Scene &scene, unirender::Renderer::Flags flags, std::shared_ptr<unirender::Renderer> &outRenderer, std::string &outErr)
+{
+	unirender::Scene::SetKernelPath(util::get_program_path() + "/modules/unirender/cycles");
+	outRenderer = unirender::cycles::Renderer::Create(scene, outErr, flags);
+	return outRenderer != nullptr;
+}
 };
