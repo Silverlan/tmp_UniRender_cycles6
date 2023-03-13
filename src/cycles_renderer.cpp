@@ -143,7 +143,7 @@ static bool is_device_type_available(ccl::DeviceType type)
 	return ccl::Device::available_devices(DEVICE_MASK(type)).empty() == false;
 }
 
-ccl::float3 unirender::cycles::Renderer::ToCyclesVector(const Vector3 &v) { return ccl::float3 {v.x, v.y, v.z}; }
+ccl::float3 unirender::cycles::Renderer::ToCyclesVector(const Vector3 &v) { return ccl::float3 {v.x, v.z, v.y}; }
 
 Vector3 unirender::cycles::Renderer::ToPragmaPosition(const ccl::float3 &pos)
 {
