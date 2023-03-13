@@ -91,6 +91,7 @@ namespace unirender::cycles {
 	  public:
 		OutputDriver(const std::vector<std::pair<std::string, uimg::Format>> &passes, uint32_t width, uint32_t height);
 		std::shared_ptr<uimg::ImageBuffer> GetImageBuffer(const std::string &pass) const;
+		const std::unordered_map<std::string, std::shared_ptr<uimg::ImageBuffer>> &GetImageBuffers() const;
 		void Reset();
 
 		/* Write tile once it has finished rendering. */

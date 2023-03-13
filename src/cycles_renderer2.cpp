@@ -312,10 +312,10 @@ util::EventReply unirender::cycles::Renderer::HandleRenderStage(RenderWorker &wo
 					auto &normalImageBuffer = GetResultImageBuffer(OUTPUT_NORMAL, eyeStage);
 					albedoImageBuffer = GetOutputDriver()->GetImageBuffer(OUTPUT_ALBEDO);
 					normalImageBuffer = GetOutputDriver()->GetImageBuffer(OUTPUT_NORMAL);
-					assert(albedoImageBuffer != nullptr);
-					assert(normalImageBuffer != nullptr);
-					albedoImageBuffer->ToHDR();
-					normalImageBuffer->ToHDR();
+					if(albedoImageBuffer)
+						albedoImageBuffer->ToHDR();
+					if(normalImageBuffer)
+						normalImageBuffer->ToHDR();
 
 					std::string debugPass;
 					GetApiData().GetFromPath("debug/returnPassAsResult")(debugPass);

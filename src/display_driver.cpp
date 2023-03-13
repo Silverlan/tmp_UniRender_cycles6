@@ -220,6 +220,7 @@ std::shared_ptr<uimg::ImageBuffer> unirender::cycles::OutputDriver::GetImageBuff
 	auto it = m_imageBuffers.find(pass);
 	return (it != m_imageBuffers.end()) ? it->second : nullptr;
 }
+const std::unordered_map<std::string, std::shared_ptr<uimg::ImageBuffer>> &unirender::cycles::OutputDriver::GetImageBuffers() const { return m_imageBuffers; }
 void unirender::cycles::OutputDriver::write_render_tile(const Tile &tile)
 {
 	for(auto &pair : m_imageBuffers) {
