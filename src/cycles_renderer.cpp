@@ -1724,6 +1724,33 @@ bool unirender::cycles::Renderer::Initialize(unirender::Scene &scene, std::strin
 	if(ShouldUseTransparentSky())
 		m_cclScene->background->set_transparent(true);
 
+	auto fGetDebugUse = [&apiData](const std::string &name, bool &out) -> bool {
+		auto dbgUse = false;
+		auto udmDbgUse = apiData.GetFromPath("cycles/debug/" + name)(dbgUse);
+		if(udmDbgUse) {
+			out = dbgUse;
+			return true;
+		}
+		return false;
+	};
+
+	auto dbgUse = false;
+	if(fGetDebugUse("use_direct_light", dbgUse))
+		m_cclScene->integrator->set_use_direct_light(dbgUse);
+	if(fGetDebugUse("use_indirect_light", dbgUse))
+		m_cclScene->integrator->set_use_indirect_light(dbgUse);
+	if(fGetDebugUse("use_diffuse", dbgUse))
+		m_cclScene->integrator->set_use_diffuse(dbgUse);
+	if(fGetDebugUse("use_glossy", dbgUse))
+		m_cclScene->integrator->set_use_glossy(dbgUse);
+	if(fGetDebugUse("use_transmission", dbgUse))
+		m_cclScene->integrator->set_use_transmission(dbgUse);
+	if(fGetDebugUse("use_emission", dbgUse))
+		m_cclScene->integrator->set_use_emission(dbgUse);
+
+	if(fGetDebugUse("use_transparent_background", dbgUse))
+		m_cclScene->background->set_transparent(dbgUse);
+
 	auto *bakeTarget = m_scene->GetBakeTargetName();
 	if(bakeTarget)
 		m_cclScene->bake_manager->set(m_cclScene, *bakeTarget);
