@@ -228,28 +228,23 @@ util::EventReply unirender::cycles::Renderer::HandleRenderStage(RenderWorker &wo
 						m_progressiveCondition.wait(lock);
 					}
 
-					auto &resultImgBuf = GetResultImageBuffer(OUTPUT_COLOR, eyeStage);
+					auto renderMode = m_scene->GetRenderMode();
+					auto passType = get_main_pass_type(renderMode);
 					if(m_bakeData) {
-						auto renderMode = m_scene->GetRenderMode();
 						switch(renderMode) {
-						case Scene::RenderMode::BakeAmbientOcclusion:
-							resultImgBuf = GetOutputDriver()->GetImageBuffer(OUTPUT_AO);
-							break;
-						case Scene::RenderMode::BakeDiffuseLighting:
-							GetResultImageBuffer(OUTPUT_DIFFUSE) = GetOutputDriver()->GetImageBuffer(OUTPUT_DIFFUSE);
-							break;
 						case Scene::RenderMode::BakeDiffuseLightingSeparate:
-							GetResultImageBuffer(OUTPUT_DIFFUSE_DIRECT) = GetOutputDriver()->GetImageBuffer(OUTPUT_DIFFUSE_DIRECT);
-							GetResultImageBuffer(OUTPUT_DIFFUSE_INDIRECT) = GetOutputDriver()->GetImageBuffer(OUTPUT_DIFFUSE_INDIRECT);
+							GetResultImageBuffer(PassType::DiffuseDirect) = GetOutputDriver()->GetImageBuffer(PassType::DiffuseDirect);
+							GetResultImageBuffer(PassType::DiffuseIndirect) = GetOutputDriver()->GetImageBuffer(PassType::DiffuseIndirect);
 							break;
 						default:
-							resultImgBuf = GetOutputDriver()->GetImageBuffer(OUTPUT_COLOR);
+							if(passType)
+								GetResultImageBuffer(*passType, eyeStage) = GetOutputDriver()->GetImageBuffer(*passType);
 							break;
 						}
 
 						if(Scene::IsLightmapRenderMode(renderMode)) {
 							worker.SetResultMessage("Fixing outliers...");
-							auto &imgBuf = GetResultImageBuffer(OUTPUT_DIFFUSE_DIRECT);
+							auto &imgBuf = GetResultImageBuffer(PassType::DiffuseDirect);
 							if(imgBuf)
 								fix_nan_pixels(*imgBuf);
 
@@ -271,22 +266,8 @@ util::EventReply unirender::cycles::Renderer::HandleRenderStage(RenderWorker &wo
 							}
 						}
 					}
-					else {
-						switch(stage) {
-						case ImageRenderStage::SceneAlbedo:
-							resultImgBuf = GetOutputDriver()->GetImageBuffer(OUTPUT_ALBEDO);
-							break;
-						case ImageRenderStage::SceneNormals:
-							resultImgBuf = GetOutputDriver()->GetImageBuffer(OUTPUT_NORMAL);
-							break;
-						case ImageRenderStage::SceneDepth:
-							resultImgBuf = GetOutputDriver()->GetImageBuffer(OUTPUT_DEPTH);
-							break;
-						default:
-							resultImgBuf = GetOutputDriver()->GetImageBuffer(OUTPUT_COLOR);
-							break;
-						}
-					}
+					else if(passType)
+						GetResultImageBuffer(*passType, eyeStage) = GetOutputDriver()->GetImageBuffer(*passType);
 
 					for(auto &pair : m_resultImageBuffers) {
 						for(auto &imgBuf : pair.second) {
@@ -308,21 +289,22 @@ util::EventReply unirender::cycles::Renderer::HandleRenderStage(RenderWorker &wo
 					if(stage != ImageRenderStage::Lighting || !umath::is_flag_set(m_stateFlags, StateFlags::NativeDenoising))
 						return StartNextRenderStage(worker, ImageRenderStage::FinalizeImage, eyeStage);
 
-					auto &albedoImageBuffer = GetResultImageBuffer(OUTPUT_ALBEDO, eyeStage);
-					auto &normalImageBuffer = GetResultImageBuffer(OUTPUT_NORMAL, eyeStage);
-					albedoImageBuffer = GetOutputDriver()->GetImageBuffer(OUTPUT_ALBEDO);
-					normalImageBuffer = GetOutputDriver()->GetImageBuffer(OUTPUT_NORMAL);
+					auto &albedoImageBuffer = GetResultImageBuffer(PassType::Albedo, eyeStage);
+					auto &normalImageBuffer = GetResultImageBuffer(PassType::Normals, eyeStage);
+					albedoImageBuffer = GetOutputDriver()->GetImageBuffer(PassType::Albedo);
+					normalImageBuffer = GetOutputDriver()->GetImageBuffer(PassType::Normals);
 					if(albedoImageBuffer)
 						albedoImageBuffer->ToHDR();
 					if(normalImageBuffer)
 						normalImageBuffer->ToHDR();
 
-					std::string debugPass;
-					GetApiData().GetFromPath("debug/returnPassAsResult")(debugPass);
-					if(!debugPass.empty()) {
+					PassType debugPass;
+					if(GetApiData().GetFromPath("debug/returnPassAsResult")(debugPass)) {
 						auto *imgBuf = FindResultImageBuffer(debugPass, eyeStage);
-						if(imgBuf)
-							GetResultImageBuffer(OUTPUT_COLOR, eyeStage) = imgBuf->Copy(uimg::Format::RGBA_FLOAT);
+						if(imgBuf) {
+							if(passType)
+								GetResultImageBuffer(*passType, eyeStage) = imgBuf->Copy(uimg::Format::RGBA_FLOAT);
+						}
 						return StartNextRenderStage(worker, ImageRenderStage::FinalizeImage, eyeStage);
 					}
 
@@ -343,8 +325,8 @@ util::EventReply unirender::cycles::Renderer::HandleRenderStage(RenderWorker &wo
 				m_cclSession->start();
 				WaitForRenderStage(worker, 0.95f, 0.025f, [this, &worker, eyeStage, stage]() mutable -> RenderStageResult {
 					m_cclSession->wait();
-					auto &albedoImageBuffer = GetResultImageBuffer(OUTPUT_ALBEDO, eyeStage);
-					albedoImageBuffer = GetOutputDriver()->GetImageBuffer(OUTPUT_ALBEDO);
+					auto &albedoImageBuffer = GetResultImageBuffer(PassType::Albedo, eyeStage);
+					albedoImageBuffer = GetOutputDriver()->GetImageBuffer(PassType::Albedo);
 					// ApplyPostProcessing(*albedoImageBuffer,m_renderMode);
 
 					auto tmpEyeStage = eyeStage;
@@ -369,8 +351,8 @@ util::EventReply unirender::cycles::Renderer::HandleRenderStage(RenderWorker &wo
 				m_cclSession->start();
 				WaitForRenderStage(worker, 0.975f, 0.025f, [this, &worker, eyeStage, stage]() mutable -> RenderStageResult {
 					m_cclSession->wait();
-					auto &normalImageBuffer = GetResultImageBuffer(OUTPUT_NORMAL, eyeStage);
-					normalImageBuffer = GetOutputDriver()->GetImageBuffer(OUTPUT_NORMAL);
+					auto &normalImageBuffer = GetResultImageBuffer(PassType::Normals, eyeStage);
+					normalImageBuffer = GetOutputDriver()->GetImageBuffer(PassType::Normals);
 					// ApplyPostProcessing(*normalImageBuffer,m_renderMode);
 
 					auto tmpEyeStage = eyeStage;
@@ -911,8 +893,11 @@ void unirender::cycles::Renderer::StartTextureBaking(RenderWorker &worker)
 void unirender::cycles::Renderer::FinalizeAndCloseCyclesScene()
 {
 	auto stateFlags = m_scene->GetStateFlags();
-	if(m_cclSession && m_outputDriver && m_scene->IsRenderSceneMode(m_scene->GetRenderMode()) && umath::is_flag_set(m_stateFlags, StateFlags::RenderingStarted))
-		GetResultImageBuffer(OUTPUT_COLOR) = GetOutputDriver()->GetImageBuffer(OUTPUT_COLOR);
+	if(m_cclSession && m_outputDriver && m_scene->IsRenderSceneMode(m_scene->GetRenderMode()) && umath::is_flag_set(m_stateFlags, StateFlags::RenderingStarted)) {
+		auto passType = get_main_pass_type(m_scene->GetRenderMode());
+		if(passType)
+			GetResultImageBuffer(*passType) = GetOutputDriver()->GetImageBuffer(*passType);
+	}
 	CloseCyclesScene();
 }
 
@@ -922,6 +907,66 @@ void unirender::cycles::Renderer::FinalizeImage(uimg::ImageBuffer &imgBuf, Stere
 {
 	if(!m_scene->HasBakeTarget()) // Don't need to flip if we're baking
 		imgBuf.Flip(true, true);
+}
+
+static std::optional<ccl::PassType> pass_type_to_ccl_pass_type(unirender::PassType passType)
+{
+	switch(passType) {
+	case unirender::PassType::Combined:
+		return ccl::PassType::PASS_COMBINED;
+	case unirender::PassType::Albedo:
+		return ccl::PassType::PASS_DIFFUSE_COLOR;
+	case unirender::PassType::Normals:
+		return ccl::PassType::PASS_NORMAL;
+	case unirender::PassType::Depth:
+		return ccl::PassType::PASS_DEPTH;
+	case unirender::PassType::Emission:
+		return ccl::PassType::PASS_EMISSION;
+	case unirender::PassType::Background:
+		return ccl::PassType::PASS_BACKGROUND;
+	case unirender::PassType::Ao:
+		return ccl::PassType::PASS_AO;
+	case unirender::PassType::Shadow:
+		return ccl::PassType::PASS_SHADOW;
+	case unirender::PassType::Diffuse:
+		return ccl::PassType::PASS_DIFFUSE;
+	case unirender::PassType::DiffuseDirect:
+		return ccl::PassType::PASS_DIFFUSE_DIRECT;
+	case unirender::PassType::DiffuseIndirect:
+		return ccl::PassType::PASS_DIFFUSE_INDIRECT;
+	case unirender::PassType::Glossy:
+		return ccl::PassType::PASS_GLOSSY;
+	case unirender::PassType::GlossyDirect:
+		return ccl::PassType::PASS_GLOSSY_DIRECT;
+	case unirender::PassType::GlossyIndirect:
+		return ccl::PassType::PASS_GLOSSY_INDIRECT;
+	case unirender::PassType::Transmission:
+		return ccl::PassType::PASS_TRANSMISSION;
+	case unirender::PassType::TransmissionDirect:
+		return ccl::PassType::PASS_TRANSMISSION_DIRECT;
+	case unirender::PassType::TransmissionIndirect:
+		return ccl::PassType::PASS_TRANSMISSION_INDIRECT;
+	case unirender::PassType::Volume:
+		return ccl::PassType::PASS_VOLUME;
+	case unirender::PassType::VolumeDirect:
+		return ccl::PassType::PASS_VOLUME_DIRECT;
+	case unirender::PassType::VolumeIndirect:
+		return ccl::PassType::PASS_VOLUME_INDIRECT;
+	case unirender::PassType::Position:
+		return ccl::PassType::PASS_POSITION;
+	case unirender::PassType::Roughness:
+		return ccl::PassType::PASS_ROUGHNESS;
+	case unirender::PassType::Uv:
+		return ccl::PassType::PASS_UV;
+	case unirender::PassType::DiffuseColor:
+		return ccl::PassType::PASS_DIFFUSE_COLOR;
+	case unirender::PassType::GlossyColor:
+		return ccl::PassType::PASS_GLOSSY_COLOR;
+	case unirender::PassType::TransmissionColor:
+		return ccl::PassType::PASS_TRANSMISSION_COLOR;
+	}
+	static_assert(umath::to_integral(unirender::PassType::Count) == 26, "Update this implementation when new types are added!");
+	return {};
 }
 
 void unirender::cycles::Renderer::SetupRenderSettings(ccl::Scene &scene, ccl::Session &session, ccl::BufferParams &bufferParams, unirender::Scene::RenderMode renderMode, uint32_t maxTransparencyBounces) const
@@ -1066,105 +1111,40 @@ void unirender::cycles::Renderer::SetupRenderSettings(ccl::Scene &scene, ccl::Se
 	session.params.use_profiling = false;
 	session.params.shadingsystem = ccl::ShadingSystem::SHADINGSYSTEM_SVM;
 
-	for(auto &pair : m_outputs) {
-		if(pair.first == OUTPUT_COLOR) {
+	for(auto &pair : m_passes) {
+		auto cclPass = pass_type_to_ccl_pass_type(pair.first);
+		if(cclPass.has_value()) {
 			auto *pass = scene.create_node<ccl::Pass>();
-			pass->set_name(ccl::ustring {OUTPUT_COLOR});
-			pass->set_type(ccl::PASS_COMBINED);
-			break;
-		}
-		else if(pair.first == OUTPUT_DIFFUSE) {
-			auto *pass = scene.create_node<ccl::Pass>();
-			pass->set_name(ccl::ustring {OUTPUT_DIFFUSE});
-			pass->set_type(ccl::PASS_DIFFUSE);
-			pass->set_include_albedo(false);
-		}
-		else if(pair.first == OUTPUT_DIFFUSE_DIRECT) {
-			auto *pass = scene.create_node<ccl::Pass>();
-			pass->set_name(ccl::ustring {OUTPUT_DIFFUSE_DIRECT});
-			pass->set_type(ccl::PASS_DIFFUSE_DIRECT);
-			pass->set_include_albedo(false);
-		}
-		else if(pair.first == OUTPUT_DIFFUSE_INDIRECT) {
-			auto *pass = scene.create_node<ccl::Pass>();
-			pass->set_name(ccl::ustring {OUTPUT_DIFFUSE_INDIRECT});
-			pass->set_type(ccl::PASS_DIFFUSE_INDIRECT);
-			pass->set_include_albedo(false);
-		}
-		else if(pair.first == OUTPUT_ALBEDO) {
-			auto *pass = scene.create_node<ccl::Pass>();
-			pass->set_name(ccl::ustring {OUTPUT_ALBEDO});
-			if(m_scene->GetRenderMode() == unirender::Scene::RenderMode::SceneAlbedo)
-				pass->set_type(ccl::PASS_DIFFUSE_COLOR);
-			else
-				pass->set_type(ccl::PASS_DENOISING_ALBEDO);
-		}
-		else if(pair.first == OUTPUT_NORMAL) {
-			auto *pass = scene.create_node<ccl::Pass>();
-			pass->set_name(ccl::ustring {OUTPUT_NORMAL});
-			if(m_scene->GetRenderMode() == unirender::Scene::RenderMode::SceneNormals)
-				pass->set_type(ccl::PASS_NORMAL);
-			else
-				pass->set_type(ccl::PASS_DENOISING_NORMAL);
-		}
-		else if(pair.first == OUTPUT_DEPTH) {
-			auto *pass = scene.create_node<ccl::Pass>();
-			pass->set_name(ccl::ustring {OUTPUT_DEPTH});
-			if(m_scene->GetRenderMode() == unirender::Scene::RenderMode::SceneDepth)
-				pass->set_type(ccl::PASS_DEPTH);
-			else
-				pass->set_type(ccl::PASS_DENOISING_DEPTH);
-		}
-		else if(pair.first == OUTPUT_AO) {
-			auto *pass = scene.create_node<ccl::Pass>();
-			pass->set_name(ccl::ustring {OUTPUT_AO});
-			pass->set_type(ccl::PASS_AO);
-			pass->set_include_albedo(false);
-		}
-	}
+			pass->set_name(ccl::ustring {std::string {magic_enum::enum_name(pair.first)}});
+			pass->set_type(*cclPass);
 
-#if 0
-	ccl::vector<ccl::BufferPass> passes;
-	auto displayPass = ccl::PassType::PASS_DIFFUSE_COLOR;
-	switch(renderMode)
-	{
-	case unirender::Scene::RenderMode::SceneAlbedo:
-		// Note: PASS_DIFFUSE_COLOR would probably make more sense but does not seem to work
-		// (just creates a black output).
-		ccl::Pass::add(ccl::PassType::PASS_COMBINED,passes,"combined");
-		ccl::Pass::add(ccl::PassType::PASS_DEPTH,passes,"depth");
-		displayPass = ccl::PassType::PASS_COMBINED;
-		break;
-	case unirender::Scene::RenderMode::SceneNormals:
-		ccl::Pass::add(ccl::PassType::PASS_COMBINED,passes,"combined");
-		ccl::Pass::add(ccl::PassType::PASS_DEPTH,passes,"depth");
-		displayPass = ccl::PassType::PASS_COMBINED;
-		break;
-	case unirender::Scene::RenderMode::SceneDepth:
-		ccl::Pass::add(ccl::PassType::PASS_COMBINED,passes,"combined"); // TODO: Why do we need this?
-		ccl::Pass::add(ccl::PassType::PASS_DEPTH,passes,"depth");
-		displayPass = ccl::PassType::PASS_COMBINED;
-		break;
-	case unirender::Scene::RenderMode::RenderImage:
-		ccl::Pass::add(ccl::PassType::PASS_COMBINED,passes,"combined");
-		ccl::Pass::add(ccl::PassType::PASS_DEPTH,passes,"depth");
-		displayPass = ccl::PassType::PASS_COMBINED;
-		break;
-	case unirender::Scene::RenderMode::BakeAmbientOcclusion:
-		ccl::Pass::add(ccl::PassType::PASS_AO,passes,"ao");
-		ccl::Pass::add(ccl::PassType::PASS_DEPTH,passes,"depth");
-		displayPass = ccl::PassType::PASS_AO;
-		break;
-	case unirender::Scene::RenderMode::BakeDiffuseLighting:
-		//ccl::Pass::add(ccl::PassType::PASS_DIFFUSE_DIRECT,passes,"diffuse_direct");
-		//ccl::Pass::add(ccl::PassType::PASS_DIFFUSE_INDIRECT,passes,"diffuse_indirect");
-		ccl::Pass::add(ccl::PassType::PASS_COMBINED,passes,"combined");
-		ccl::Pass::add(ccl::PassType::PASS_DEPTH,passes,"depth");
-		displayPass = ccl::PassType::PASS_COMBINED; // TODO: Is this correct?
-		break;
+			if(pair.first == PassType::Diffuse || pair.first == PassType::DiffuseDirect || pair.first == PassType::DiffuseIndirect || pair.first == PassType::Ao)
+				pass->set_include_albedo(false);
+
+			if(pair.first == PassType::Albedo) {
+				if(m_scene->GetRenderMode() == unirender::Scene::RenderMode::SceneAlbedo)
+					pass->set_type(ccl::PASS_DIFFUSE_COLOR);
+				else
+					pass->set_type(ccl::PASS_DENOISING_ALBEDO);
+			}
+			if(pair.first == PassType::Normals) {
+				if(m_scene->GetRenderMode() == unirender::Scene::RenderMode::SceneNormals)
+					pass->set_type(ccl::PASS_NORMAL);
+				else
+					pass->set_type(ccl::PASS_DENOISING_NORMAL);
+			}
+			if(pair.first == PassType::Depth) {
+				if(m_scene->GetRenderMode() == unirender::Scene::RenderMode::SceneDepth)
+					pass->set_type(ccl::PASS_DEPTH);
+				else
+					pass->set_type(ccl::PASS_DENOISING_DEPTH);
+			}
+		}
+		else {
+			std::cerr << "WARNING: Unsupported pass type: " << magic_enum::enum_name(pair.first) << std::endl;
+			continue;
+		}
 	}
-	bufferParams.passes = passes;
-#endif
 
 	if(sceneInfo.motionBlurStrength > 0.f) {
 		// ccl::Pass::add(ccl::PassType::PASS_MOTION,passes);

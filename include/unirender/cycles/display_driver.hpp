@@ -28,6 +28,7 @@ namespace util::baking {
 };
 namespace unirender {
 	class TileManager;
+	enum class PassType : uint32_t;
 };
 namespace unirender::cycles {
 	class BaseDriver {
@@ -89,9 +90,14 @@ namespace unirender::cycles {
 
 	class OutputDriver : public ccl::OutputDriver, public BaseDriver {
 	  public:
-		OutputDriver(const std::vector<std::pair<std::string, uimg::Format>> &passes, uint32_t width, uint32_t height);
-		std::shared_ptr<uimg::ImageBuffer> GetImageBuffer(const std::string &pass) const;
-		const std::unordered_map<std::string, std::shared_ptr<uimg::ImageBuffer>> &GetImageBuffers() const;
+		struct PassInfo {
+			std::string passName;
+			std::shared_ptr<uimg::ImageBuffer> imageBuffer;
+		};
+
+		OutputDriver(const std::vector<std::pair<PassType, uimg::Format>> &passes, uint32_t width, uint32_t height);
+		std::shared_ptr<uimg::ImageBuffer> GetImageBuffer(PassType pass) const;
+		const std::unordered_map<PassType, PassInfo> &GetImageBuffers() const;
 		void Reset();
 
 		/* Write tile once it has finished rendering. */
@@ -110,9 +116,9 @@ namespace unirender::cycles {
 	  private:
 		void DebugDumpImages();
 		std::vector<Vector4> m_tileData;
-		std::unordered_map<std::string, std::shared_ptr<uimg::ImageBuffer>> m_imageBuffers;
+		std::unordered_map<unirender::PassType, PassInfo> m_imageBuffers;
 		const util::baking::BakeDataView *m_bakeData = nullptr;
-		std::vector<std::pair<std::string, uimg::Format>> m_passes;
+		std::vector<std::pair<unirender::PassType, uimg::Format>> m_passes;
 	};
 };
 

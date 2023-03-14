@@ -8,11 +8,13 @@
 #include "unirender/cycles/display_driver.hpp"
 #include <util_raytracing/tilemanager.hpp>
 #include <util_raytracing/denoise.hpp>
+#include <util_raytracing/renderer.hpp>
 #include <util_image.hpp>
 #include <mathutil/color.h>
 #include <sharedutils/util_string.h>
 #include <sharedutils/util.h>
 #include <sharedutils/util_baking.hpp>
+#include <sharedutils/magic_enum.hpp>
 #include <fsys/filesystem.h>
 #include <fsys/ifile.hpp>
 #include <util_image_buffer.hpp>
@@ -196,7 +198,7 @@ void unirender::cycles::DisplayDriver::draw(const Params &params) {}
 
 ////////////
 
-unirender::cycles::OutputDriver::OutputDriver(const std::vector<std::pair<std::string, uimg::Format>> &passes, uint32_t width, uint32_t height) : BaseDriver {width, height}, m_passes {passes}
+unirender::cycles::OutputDriver::OutputDriver(const std::vector<std::pair<PassType, uimg::Format>> &passes, uint32_t width, uint32_t height) : BaseDriver {width, height}, m_passes {passes}
 {
 	m_tileData.resize(width * height);
 	Reset();
@@ -207,26 +209,27 @@ void unirender::cycles::OutputDriver::Reset()
 	m_imageBuffers.reserve(m_passes.size());
 	for(auto &pair : m_passes) {
 		auto imgBuf = uimg::ImageBuffer::Create(m_width, m_height, pair.second);
-		m_imageBuffers[pair.first] = imgBuf;
+		m_imageBuffers[pair.first] = PassInfo {std::string {magic_enum::enum_name(pair.first)}, imgBuf};
 	}
 }
 void unirender::cycles::OutputDriver::DebugDumpImages()
 {
 	for(auto &pair : m_imageBuffers)
-		dump_image_file(pair.first, *pair.second);
+		dump_image_file(std::string {magic_enum::enum_name(pair.first)}, *pair.second.imageBuffer);
 }
-std::shared_ptr<uimg::ImageBuffer> unirender::cycles::OutputDriver::GetImageBuffer(const std::string &pass) const
+std::shared_ptr<uimg::ImageBuffer> unirender::cycles::OutputDriver::GetImageBuffer(PassType pass) const
 {
 	auto it = m_imageBuffers.find(pass);
-	return (it != m_imageBuffers.end()) ? it->second : nullptr;
+	return (it != m_imageBuffers.end()) ? it->second.imageBuffer : nullptr;
 }
-const std::unordered_map<std::string, std::shared_ptr<uimg::ImageBuffer>> &unirender::cycles::OutputDriver::GetImageBuffers() const { return m_imageBuffers; }
+const std::unordered_map<unirender::PassType, unirender::cycles::OutputDriver::PassInfo> &unirender::cycles::OutputDriver::GetImageBuffers() const { return m_imageBuffers; }
 void unirender::cycles::OutputDriver::write_render_tile(const Tile &tile)
 {
 	for(auto &pair : m_imageBuffers) {
-		auto &imgBuf = pair.second;
+		auto &info = pair.second;
+		auto &imgBuf = info.imageBuffer;
 		assert(imgBuf->IsFloatFormat());
-		if(!tile.get_pass_pixels(pair.first, imgBuf->GetChannelCount(), reinterpret_cast<float *>(m_tileData.data())))
+		if(!tile.get_pass_pixels(info.passName, imgBuf->GetChannelCount(), reinterpret_cast<float *>(m_tileData.data())))
 			continue;
 		memcpy(imgBuf->GetData(), m_tileData.data(), util::size_of_container(m_tileData));
 	}

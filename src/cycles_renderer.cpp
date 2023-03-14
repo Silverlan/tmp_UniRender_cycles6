@@ -1522,39 +1522,29 @@ bool unirender::cycles::Renderer::Initialize(unirender::Scene &scene, std::strin
 	}
 
 	switch(scene.GetRenderMode()) {
-	case unirender::Scene::RenderMode::SceneAlbedo:
-		AddOutput(OUTPUT_ALBEDO);
-		break;
-	case unirender::Scene::RenderMode::SceneNormals:
-		AddOutput(OUTPUT_NORMAL);
-		break;
-	case unirender::Scene::RenderMode::SceneDepth:
-		AddOutput(OUTPUT_DEPTH);
-		break;
-	case unirender::Scene::RenderMode::BakeAmbientOcclusion:
-		AddOutput(OUTPUT_AO);
-		break;
-	case unirender::Scene::RenderMode::BakeNormals:
-		AddOutput(OUTPUT_COLOR);
-		break;
-	case unirender::Scene::RenderMode::BakeDiffuseLighting:
-		AddOutput(OUTPUT_DIFFUSE);
-		break;
 	case unirender::Scene::RenderMode::BakeDiffuseLightingSeparate:
-		AddOutput(OUTPUT_DIFFUSE_DIRECT);
-		AddOutput(OUTPUT_DIFFUSE_INDIRECT);
+		AddPass(PassType::DiffuseDirect);
+		AddPass(PassType::DiffuseIndirect);
 		break;
 	case unirender::Scene::RenderMode::RenderImage:
 		{
-			AddOutput(OUTPUT_COLOR);
+			AddPass(PassType::Combined);
 			if(umath::is_flag_set(m_stateFlags, StateFlags::NativeDenoising)) {
-				AddOutput(OUTPUT_ALBEDO);
-				AddOutput(OUTPUT_NORMAL);
+				AddPass(PassType::Albedo);
+				AddPass(PassType::Normals);
 			}
 			break;
 		}
 	default:
-		return false;
+		{
+			auto passType = get_main_pass_type(scene.GetRenderMode());
+			if(passType)
+				AddPass(*passType);
+			else {
+				std::cout << "Unsupported render mode: " << magic_enum::enum_name(scene.GetRenderMode()) << std::endl;
+				return false;
+			}
+		}
 	}
 
 	InitializeSession(scene, *devInfo);
@@ -1687,9 +1677,9 @@ bool unirender::cycles::Renderer::Initialize(unirender::Scene &scene, std::strin
 		m_tileManager.SetExposure(sceneInfo.exposure);
 	}
 
-	std::vector<std::pair<std::string, uimg::Format>> passes;
-	passes.reserve(m_outputs.size());
-	for(auto &pair : m_outputs)
+	std::vector<std::pair<PassType, uimg::Format>> passes;
+	passes.reserve(m_passes.size());
+	for(auto &pair : m_passes)
 		passes.push_back({pair.first, uimg::Format::RGBA32});
 
 	if(m_scene->HasBakeTarget() && !InitializeBakingData()) {
