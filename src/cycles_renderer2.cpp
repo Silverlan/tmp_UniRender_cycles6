@@ -222,6 +222,8 @@ util::EventReply unirender::cycles::Renderer::HandleRenderStage(RenderWorker &wo
 
 				auto progressMultiplier = umath::is_flag_set(m_stateFlags, StateFlags::NativeDenoising) ? 0.95f : 1.f;
 				WaitForRenderStage(worker, 0.f, progressMultiplier, [this, &worker, stage, eyeStage]() mutable -> RenderStageResult {
+					SetIsBuildingKernels(false);
+
 					if(umath::is_flag_set(m_stateFlags, StateFlags::ProgressiveRefine) == false)
 						m_cclSession->wait();
 					else if(m_progressiveRunning) {
@@ -325,6 +327,7 @@ util::EventReply unirender::cycles::Renderer::HandleRenderStage(RenderWorker &wo
 				validate_session(*m_cclScene);
 				m_cclSession->start();
 				WaitForRenderStage(worker, 0.95f, 0.025f, [this, &worker, eyeStage, stage]() mutable -> RenderStageResult {
+					SetIsBuildingKernels(false);
 					m_cclSession->wait();
 					auto &albedoImageBuffer = GetResultImageBuffer(PassType::Albedo, eyeStage);
 					albedoImageBuffer = GetOutputDriver()->GetImageBuffer(PassType::Albedo);
@@ -351,6 +354,7 @@ util::EventReply unirender::cycles::Renderer::HandleRenderStage(RenderWorker &wo
 				validate_session(*m_cclScene);
 				m_cclSession->start();
 				WaitForRenderStage(worker, 0.975f, 0.025f, [this, &worker, eyeStage, stage]() mutable -> RenderStageResult {
+					SetIsBuildingKernels(false);
 					m_cclSession->wait();
 					auto &normalImageBuffer = GetResultImageBuffer(PassType::Normals, eyeStage);
 					normalImageBuffer = GetOutputDriver()->GetImageBuffer(PassType::Normals);
@@ -424,11 +428,18 @@ void unirender::cycles::Renderer::WaitForRenderStage(RenderWorker &worker, float
 			m_curStatus = status;
 			m_curSubStatus = subStatus;
 
+			// Unfortunately Cycles doesn't provide a direct way to determine if kernels are being built, so we have to check the status string.
+			auto isBuildingKernels = (status == "Loading render kernels (may take a few minutes the first time)");
+			SetIsBuildingKernels(isBuildingKernels);
+
 			auto &logger = unirender::get_logger();
 			if(logger)
 				logger->info("Session status: {} ({})", status, subStatus);
 		}
+		if(umath::min(m_cclSession->progress.get_progress(), 1.0) == 1.0 || status == "Finished") {
+			SetIsBuildingKernels(false);
 			break;
+		}
 		std::this_thread::sleep_for(std::chrono::milliseconds {100});
 	}
 	if(worker.GetStatus() == util::JobStatus::Pending && fOnComplete != nullptr && fOnComplete() == RenderStageResult::Continue)
@@ -493,6 +504,7 @@ void unirender::cycles::Renderer::SetCancelled(const std::string &msg)
 	m_cclSession->progress.set_cancel(msg);
 	m_cclSession->cancel(true);
 	m_tileManager.Cancel();
+	SetIsBuildingKernels(false);
 }
 
 void unirender::cycles::Renderer::CloseCyclesScene()
@@ -504,6 +516,7 @@ void unirender::cycles::Renderer::CloseCyclesScene()
 	if(m_cclSession == nullptr)
 		return;
 	m_cclSession = nullptr;
+	SetIsBuildingKernels(false);
 }
 
 bool unirender::cycles::Renderer::InitializeBakingData()

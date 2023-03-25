@@ -231,8 +231,8 @@ ccl::SessionParams unirender::cycles::Renderer::GetSessionParameters(const unire
 	ccl::SessionParams sessionParams {};
 	sessionParams.shadingsystem = ccl::SHADINGSYSTEM_SVM;
 	sessionParams.device = devInfo;
-	sessionParams.background = !umath::is_flag_set(m_flags, Flags::EnableLiveEditing); // Live denoising will not work for background mode
-	sessionParams.use_auto_tile = false;                                               // Tile rendering is no longer relevant for Cycles X (and causes the output driver to not function properly)
+	sessionParams.background = !umath::is_flag_set(static_cast<unirender::Renderer::Flags>(m_flags), Flags::EnableLiveEditing); // Live denoising will not work for background mode
+	sessionParams.use_auto_tile = false;                                                                                        // Tile rendering is no longer relevant for Cycles X (and causes the output driver to not function properly)
 
 	switch(m_deviceType) {
 	case unirender::Scene::DeviceType::GPU:
@@ -1573,7 +1573,7 @@ bool unirender::cycles::Renderer::Initialize(unirender::Scene &scene, std::strin
 		m_cclScene->integrator->set_denoiser_type(denoiserType);
 		m_cclScene->integrator->set_denoise_start_sample(1);
 		// m_cclScene->integrator->set_denoiser_prefilter(ccl::DenoiserPrefilter::DENOISER_PREFILTER_FAST);
-		if(umath::is_flag_set(m_flags, Flags::EnableLiveEditing)) {
+		if(umath::is_flag_set(static_cast<unirender::Renderer::Flags>(m_flags), Flags::EnableLiveEditing)) {
 			m_cclScene->integrator->set_use_denoise_pass_albedo(true);
 			m_cclScene->integrator->set_use_denoise_pass_normal(false);
 		}
