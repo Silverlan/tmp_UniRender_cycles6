@@ -19,6 +19,7 @@
 #include "util_raytracing/model_cache.hpp"
 #include "util_raytracing/color_management.hpp"
 #include "util_raytracing/denoise.hpp"
+#include <spdlog/logger.h>
 #include <sharedutils/util_hair.hpp>
 #include <sharedutils/util_baking.hpp>
 #include <fsys/ifile.hpp>
@@ -109,14 +110,19 @@ static void init_cycles()
 #endif
 
 	if(optixPath.has_value()) {
-		std::cout << "Found Optix SDK: " << *optixPath << std::endl;
+		auto &logger = unirender::get_logger();
+		if(logger)
+			logger->info("Found Optix SDK: {}", *optixPath);
 		util::set_env_variable("OPTIX_ROOT_DIR", *optixPath);
 		// Note: The above should work, but for some reason it doesn't in some cases?
 		// We'll use putenv as well, just to be sure.
 		putenv(("OPTIX_ROOT_DIR=" + *optixPath).data());
 	}
-	else
-		std::cout << "Could not find Optix SDK! Dynamic Optix kernel building will be disabled!" << std::endl;
+	else {
+		auto &logger = unirender::get_logger();
+		if(logger)
+			logger->info("Could not find Optix SDK! Dynamic Optix kernel building will be disabled!");
+	}
 #ifdef ENABLE_CYCLES_LOGGING
 	// ccl::util_logging_init("util_raytracing");
 	// ccl::util_logging_verbosity_set(2);
@@ -711,36 +717,40 @@ void unirender::cycles::Renderer::SyncCamera(const unirender::Camera &cam, bool 
 	if(update)
 		return;
 	//
-	std::cout << "Camera settings:" << std::endl;
-	std::cout << "Width: " << cclCam.get_full_width() << std::endl;
-	std::cout << "Height: " << cclCam.get_full_height() << std::endl;
-	std::cout << "NearZ: " << cclCam.get_nearclip() << std::endl;
-	std::cout << "FarZ: " << cclCam.get_farclip() << std::endl;
-	std::cout << "FOV: " << umath::rad_to_deg(cclCam.get_fov()) << std::endl;
-	std::cout << "Focal Distance: " << cclCam.get_focaldistance() << std::endl;
-	std::cout << "Aperture Size: " << cclCam.get_aperturesize() << std::endl;
-	std::cout << "Aperture Ratio: " << cclCam.get_aperture_ratio() << std::endl;
-	std::cout << "Blades: " << cclCam.get_blades() << std::endl;
-	std::cout << "Blades Rotation: " << cclCam.get_bladesrotation() << std::endl;
-	std::cout << "Interocular Distance: " << cclCam.get_interocular_distance() << std::endl;
-	std::cout << "Longitude Max: " << cclCam.get_longitude_max() << std::endl;
-	std::cout << "Longitude Min: " << cclCam.get_longitude_min() << std::endl;
-	std::cout << "Latitude Max: " << cclCam.get_latitude_max() << std::endl;
-	std::cout << "Latitude Min: " << cclCam.get_latitude_min() << std::endl;
-	std::cout << "Use Spherical Stereo: " << cclCam.get_use_spherical_stereo() << std::endl;
-	std::cout << "Matrix: ";
-	auto first = true;
-	for(uint8_t i = 0; i < 3; ++i) {
-		for(uint8_t j = 0; j < 4; ++j) {
-			auto v = cclCam.get_matrix()[i][j];
-			if(first)
-				first = false;
-			else
-				std::cout << ",";
-			std::cout << v;
+	auto &logger = unirender::get_logger();
+	if(logger) {
+		logger->info("Camera settings:");
+		logger->info("\tWidth: {}", cclCam.get_full_width());
+		logger->info("\tHeight: {}", cclCam.get_full_height());
+		logger->info("\tNearZ: {}", cclCam.get_nearclip());
+		logger->info("\tFarZ: {}", cclCam.get_farclip());
+		logger->info("\tFOV: {}", umath::rad_to_deg(cclCam.get_fov()));
+		logger->info("\tFocal Distance: {}", cclCam.get_focaldistance());
+		logger->info("\tAperture Size: {}", cclCam.get_aperturesize());
+		logger->info("\tAperture Ratio: {}", cclCam.get_aperture_ratio());
+		logger->info("\tBlades: {}", cclCam.get_blades());
+		logger->info("\tBlades Rotation: {}", umath::rad_to_deg(cclCam.get_bladesrotation()));
+		logger->info("\tInterocular Distance: {}", cclCam.get_interocular_distance());
+		logger->info("\tLongitude Max: {}", umath::rad_to_deg(cclCam.get_longitude_max()));
+		logger->info("\tLongitude Min: {}", umath::rad_to_deg(cclCam.get_longitude_min()));
+		logger->info("\tLatitude Max: {}", umath::rad_to_deg(cclCam.get_latitude_max()));
+		logger->info("\tLatitude Min: {}", umath::rad_to_deg(cclCam.get_latitude_min()));
+		logger->info("\tStereoscopic: {}", cclCam.get_use_spherical_stereo());
+
+		std::stringstream ssMatrix;
+		auto first = true;
+		for(uint8_t i = 0; i < 3; ++i) {
+			for(uint8_t j = 0; j < 4; ++j) {
+				auto v = cclCam.get_matrix()[i][j];
+				if(first)
+					first = false;
+				else
+					ssMatrix << ",";
+				ssMatrix << v;
+			}
 		}
+		logger->info("\tMatrix: {}", ssMatrix.str());
 	}
-	std::cout << std::endl;
 	//
 
 #if 0
@@ -1484,7 +1494,10 @@ bool unirender::cycles::Renderer::Initialize(unirender::Scene &scene, std::strin
 		std::string deviceName = "CPU";
 		udmDebugStandalone["device"](deviceName);
 
-		std::cout << "Selected device: " << deviceName << std::endl;
+		auto &logger = unirender::get_logger();
+		if(logger)
+			logger->info("Selected device: {}", deviceName);
+
 		auto strSamples = std::to_string(samples);
 		const char *args[] = {"", xmlFile.c_str(), "--output", outputFile.c_str(), "--samples", strSamples.c_str(), "--device", deviceName.c_str(), "--background"};
 		cycles_standalone_test(9, args, false);
@@ -1541,7 +1554,9 @@ bool unirender::cycles::Renderer::Initialize(unirender::Scene &scene, std::strin
 			if(passType)
 				AddPass(*passType);
 			else {
-				std::cout << "Unsupported render mode: " << magic_enum::enum_name(scene.GetRenderMode()) << std::endl;
+				auto &logger = unirender::get_logger();
+				if(logger)
+					logger->error("Unsupported render mode: {}", magic_enum::enum_name(scene.GetRenderMode()));
 				return false;
 			}
 		}
@@ -2146,7 +2161,22 @@ void unirender::cycles::Renderer::WriteRenderTile(unirender::TileManager &tileMa
 extern "C" {
 bool DLLEXPORT create_renderer(const unirender::Scene &scene, unirender::Renderer::Flags flags, std::shared_ptr<unirender::Renderer> &outRenderer, std::string &outErr)
 {
-	unirender::Scene::SetKernelPath(util::get_program_path() + "/modules/unirender/cycles");
+	auto kernelPath = util::get_program_path() + "/modules/unirender/cycles";
+	unirender::Scene::SetKernelPath(kernelPath);
+
+	// Cycles can build the kernels during runtime if they don't exist, but unfortunately
+	// it refuses to do so if the "lib" directory exists (because it assumes that the kernels have been
+	// prebuilt if that is the case).
+	// We'll remove the lib directory if it is empty to enable runtime kernel building if there are no prebuilt kernels.
+	auto libPath = kernelPath + "/lib";
+	if(filemanager::exists_system(libPath)) {
+		std::vector<std::string> files;
+		std::vector<std::string> dirs;
+		filemanager::find_system_files(libPath + "/*", &files, &dirs);
+		if(files.empty() && dirs.empty())
+			filemanager::remove_system_directory(libPath);
+	}
+
 	outRenderer = unirender::cycles::Renderer::Create(scene, outErr, flags);
 	return outRenderer != nullptr;
 }

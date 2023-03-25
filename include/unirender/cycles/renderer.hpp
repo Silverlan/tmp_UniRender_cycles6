@@ -171,6 +171,9 @@ namespace unirender::cycles {
 		ccl::SessionParams m_sessionParams;
 		ccl::BufferParams m_bufferParams;
 
+		std::string m_curStatus;
+		std::string m_curSubStatus;
+
 		Scene::RenderMode m_renderMode = Scene::RenderMode::RenderImage;
 	};
 };

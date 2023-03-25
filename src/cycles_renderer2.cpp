@@ -22,6 +22,7 @@
 #include "util_raytracing/denoise.hpp"
 #include <sharedutils/util_hair.hpp>
 #include <sharedutils/util_baking.hpp>
+#include <spdlog/logger.h>
 #include <fsys/ifile.hpp>
 #include <util_ocio.hpp>
 #include <scene/light.h>
@@ -400,21 +401,33 @@ void unirender::cycles::Renderer::WaitForRenderStage(RenderWorker &worker, float
 		if(m_cclSession->progress.get_cancel()) {
 			if(m_restartState != 0)
 				continue;
-			std::cerr << "WARNING: Cycles rendering has been cancelled: " << m_cclSession->progress.get_cancel_message() << std::endl;
+			auto &logger = unirender::get_logger();
+			if(logger)
+				logger->error("Cycles rendering has been cancelled: {}", m_cclSession->progress.get_cancel_message());
 			worker.Cancel(m_cclSession->progress.get_cancel_message(), 1 /* error code */);
+			SetCancelled(m_cclSession->progress.get_cancel_message());
 			break;
 		}
 		if(m_cclSession->progress.get_error()) {
 			std::string status;
 			std::string subStatus;
 			m_cclSession->progress.get_status(status, subStatus);
-			std::cerr << "WARNING: Cycles rendering has failed at status '" << status << "' (" << subStatus << ") with error: " << m_cclSession->progress.get_error_message() << std::endl;
+			auto &logger = unirender::get_logger();
+			if(logger)
+				logger->error("Cycles rendering has failed at status '{}' ({}) with error: {}", status, subStatus, m_cclSession->progress.get_error_message());
 			worker.SetStatus(util::JobStatus::Failed, m_cclSession->progress.get_error_message());
 			break;
 		}
 		std::string status, subStatus;
 		m_cclSession->progress.get_status(status, subStatus);
-		if(umath::min(m_cclSession->progress.get_progress(), 1.0) == 1.0 || status == "Finished")
+		if(status != m_curStatus || subStatus != m_curSubStatus) {
+			m_curStatus = status;
+			m_curSubStatus = subStatus;
+
+			auto &logger = unirender::get_logger();
+			if(logger)
+				logger->info("Session status: {} ({})", status, subStatus);
+		}
 			break;
 		std::this_thread::sleep_for(std::chrono::milliseconds {100});
 	}
@@ -1141,7 +1154,9 @@ void unirender::cycles::Renderer::SetupRenderSettings(ccl::Scene &scene, ccl::Se
 			}
 		}
 		else {
-			std::cerr << "WARNING: Unsupported pass type: " << magic_enum::enum_name(pair.first) << std::endl;
+			auto &logger = unirender::get_logger();
+			if(logger)
+				logger->error("Unsupported pass type: {}", magic_enum::enum_name(pair.first));
 			continue;
 		}
 	}

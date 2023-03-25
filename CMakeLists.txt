@@ -71,6 +71,7 @@ link_external_library(cycles_tbb)
 link_external_library(cycles_glog)
 link_external_library(util_udm)
 link_external_library(gflags)
+link_external_library(spdlog)
 
 add_include_dir(cycles)
 add_include_dir(cycles_atomic)
