@@ -363,6 +363,10 @@ std::optional<ccl::DeviceInfo> unirender::cycles::Renderer::InitializeDevice(con
 		return {}; // No device available
 	}
 
+	auto &logger = unirender::get_logger();
+	if(logger)
+		logger->info("Using device '{}'", ccl::Device::string_from_type(device->type));
+
 	auto deviceType = createInfo.deviceType;
 	if(device->type == ccl::DeviceType::DEVICE_CPU)
 		deviceType = unirender::Scene::DeviceType::CPU;
