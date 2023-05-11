@@ -36,7 +36,7 @@ jobs:
         id: build-deps
         with:
           # This will build the core dependencies, as well as cycles, but not Pragma
-          build-args: "--module pr_unirender:https://github.com/Silverlan/pr_cycles.git --build 0 --build-cycles"
+          build-args: "--with-lua-debugger=0 --module pr_unirender:https://github.com/Silverlan/pr_cycles.git --build 0 --build-cycles"
 
       - name: Build UniRender_cycles
         shell: bash
