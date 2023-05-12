@@ -184,7 +184,7 @@ if(WIN32)
 endif()
 
 if(${UNIRENDER_CYCLES_ENABLE_DEPENDENCIES})
-	add_dependencies(${PROJ_NAME} util_udm util_raytracing)
+	add_dependencies(${PROJ_NAME} util_udm util_raytracing spdlog)
 endif()
 
 if(WIN32)
