@@ -282,15 +282,22 @@ util::EventReply unirender::cycles::Renderer::HandleRenderStage(RenderWorker &wo
 
 					// ApplyPostProcessing(*resultImageBuffer,m_renderMode);
 
-					auto tmpEyeStage = eyeStage;
-					if(UpdateStereoEye(worker, stage, tmpEyeStage)) {
-						GetOutputDriver()->Reset();
-						worker.Start(); // Lighting stage for the left eye is triggered by the user, but we have to start it manually for the right eye
-						return RenderStageResult::Continue;
-					}
+					auto swapEye = [&]() {
+						auto tmpEyeStage = eyeStage;
+						if(UpdateStereoEye(worker, stage, tmpEyeStage)) {
+							GetOutputDriver()->Reset();
+							worker.Start(); // Lighting stage for the left eye is triggered by the user, but we have to start it manually for the right eye
+							return true;
+						}
+						return false;
+					};
 
-					if(stage != ImageRenderStage::Lighting || !umath::is_flag_set(m_stateFlags, StateFlags::NativeDenoising))
-						return StartNextRenderStage(worker, ImageRenderStage::FinalizeImage, eyeStage);
+					if(stage != ImageRenderStage::Lighting || !umath::is_flag_set(m_stateFlags, StateFlags::NativeDenoising)) {
+						auto res = StartNextRenderStage(worker, ImageRenderStage::FinalizeImage, eyeStage);
+						if(swapEye())
+							return RenderStageResult::Continue;
+						return res;
+					}
 
 					auto &albedoImageBuffer = GetResultImageBuffer(PassType::Albedo, eyeStage);
 					auto &normalImageBuffer = GetResultImageBuffer(PassType::Normals, eyeStage);
@@ -308,10 +315,16 @@ util::EventReply unirender::cycles::Renderer::HandleRenderStage(RenderWorker &wo
 							if(passType)
 								GetResultImageBuffer(*passType, eyeStage) = imgBuf->Copy(uimg::Format::RGBA_FLOAT);
 						}
-						return StartNextRenderStage(worker, ImageRenderStage::FinalizeImage, eyeStage);
+						auto res = StartNextRenderStage(worker, ImageRenderStage::FinalizeImage, eyeStage);
+						if(swapEye())
+							return RenderStageResult::Continue;
+						return res;
 					}
 
-					return StartNextRenderStage(worker, ImageRenderStage::Denoise, eyeStage);
+					auto res = StartNextRenderStage(worker, ImageRenderStage::Denoise, eyeStage);
+					if(swapEye())
+						return RenderStageResult::Continue;
+					return res;
 				});
 			});
 			break;
