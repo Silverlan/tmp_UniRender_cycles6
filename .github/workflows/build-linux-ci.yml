@@ -9,6 +9,9 @@ concurrency:
   group: environment-lin-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build - ${{ matrix.config.os }}
@@ -30,17 +33,16 @@ jobs:
       - name: Setup Pragma
         uses: Silverlan/pragma/github_actions/setup@master
         
-      - name: Install python-dev
-        shell: bash
-        run: |
-          sudo apt-get install python-dev libxml2-dev libxslt-dev
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
 
       - name: Build Dependencies
         uses: Silverlan/pragma/github_actions/build@master
         id: build-deps
         with:
           # This will build the core dependencies, as well as cycles, but not Pragma
-          build-args: "--with-lua-debugger=0 --module pr_unirender:https://github.com/Silverlan/pr_cycles.git --build 0 --build-cycles"
+          build-args: "--with-essential-client-modules=0 --with-common-modules=0 --with-lua-debugger=0 --module pr_unirender:https://github.com/Silverlan/pr_cycles.git --build 0 --build-cycles"
 
       - name: Build UniRender_cycles
         shell: bash
