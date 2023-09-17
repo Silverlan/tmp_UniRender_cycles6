@@ -12,6 +12,7 @@
 #include "util_raytracing/exception.hpp"
 #include "unirender/cycles/renderer.hpp"
 #include <sharedutils/util_path.hpp>
+#include <sharedutils/util_string.h>
 #include <scene/shader.h>
 #include <scene/shader_graph.h>
 #include <scene/scene.h>

@@ -1483,6 +1483,12 @@ bool unirender::cycles::Renderer::Initialize(unirender::Scene &scene, std::strin
 	if(devInfo.has_value() == false)
 		return false;
 
+	{
+		using namespace ccl;
+		auto devices = ccl::Device::available_devices(DEVICE_MASK(ccl::DeviceType::DEVICE_OPTIX));
+		std::cout << "OPTIX AVAILABLE: " << !devices.empty() << std::endl;
+	}
+
 	auto apiData = GetApiData();
 	auto udmDebugStandalone = apiData.GetFromPath("cycles/debug/debugStandalone");
 	if(udmDebugStandalone) {
@@ -2109,6 +2115,22 @@ void unirender::cycles::Renderer::AddSkybox(const std::string &texture)
 	light->set_use_mis(true);
 	light->set_max_bounces(1'024);
 	light->tag_update(m_cclScene);
+}
+
+bool unirender::cycles::Renderer::IsFeatureEnabled(Feature feature) const
+{
+	switch(feature) {
+	case Feature::OptiXAvailable:
+		{
+			{
+				using namespace ccl;
+				auto devices = ccl::Device::available_devices(DEVICE_MASK(ccl::DeviceType::DEVICE_OPTIX));
+				return !devices.empty();
+			}
+			break;
+		}
+	}
+	return unirender::Renderer::IsFeatureEnabled(feature);
 }
 
 util::ParallelJob<uimg::ImageLayerSet> unirender::cycles::Renderer::StartRender()

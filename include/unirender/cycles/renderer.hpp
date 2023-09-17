@@ -63,6 +63,7 @@ namespace unirender::cycles {
 		virtual bool ShouldUseProgressiveFloatFormat() const override { return false; }
 		virtual std::optional<std::string> SaveRenderPreview(const std::string &path, std::string &outErr) const override;
 		virtual util::ParallelJob<uimg::ImageLayerSet> StartRender() override;
+		virtual bool IsFeatureEnabled(Feature feature) const override;
 
 		virtual bool BeginSceneEdit() override;
 		virtual bool EndSceneEdit() override;
