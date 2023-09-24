@@ -11,6 +11,7 @@
 #include "util_raytracing/mesh.hpp"
 #include "util_raytracing/exception.hpp"
 #include "unirender/cycles/renderer.hpp"
+#include <spdlog/logger.h>
 #include <sharedutils/util_path.hpp>
 #include <sharedutils/util_string.h>
 #include <scene/shader.h>
@@ -709,6 +710,13 @@ void unirender::CCLShader::ApplySocketValue(const ccl::ShaderNode &shaderNode, c
 		return;
 	if(apply_translated_socket_value<ccl::NormalMapNode, unirender::nodes::normal_map::Space>(shaderNode, socketName, "space", sockDesc, node, sockType))
 		return;
+
+	if(!sockDesc.dataValue.value) {
+		auto &logger = unirender::get_logger();
+		if(logger)
+			logger->error("Socket '{}' of shader node '{}' has invalid value!", socketName, shaderNode.name.string());
+		return;
+	}
 
 	switch(sockDesc.dataValue.type) {
 	case SocketType::Bool:
