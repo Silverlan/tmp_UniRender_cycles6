@@ -19,6 +19,7 @@
 #include <scene/scene.h>
 #include <scene/shader_nodes.h>
 #include <OpenImageIO/ustring.h>
+#include <fsys/filesystem.h>
 
 ccl::NodeMathType unirender::cycles::to_ccl_type(unirender::nodes::math::MathType type)
 {
