@@ -107,6 +107,8 @@ ccl::NodeMathType unirender::cycles::to_ccl_type(unirender::nodes::math::MathTyp
 	}
 	static_assert(umath::to_integral(unirender::nodes::math::MathType::Add) == ccl::NodeMathType::NODE_MATH_ADD && umath::to_integral(unirender::nodes::math::MathType::SmoothMax) == ccl::NodeMathType::NODE_MATH_SMOOTH_MAX);
 	static_assert(umath::to_integral(unirender::nodes::math::MathType::Count) == 40);
+	// Unreachable
+	return {};
 }
 ccl::NodeVectorTransformType unirender::cycles::to_ccl_type(unirender::nodes::vector_transform::Type type)
 {
@@ -119,6 +121,8 @@ ccl::NodeVectorTransformType unirender::cycles::to_ccl_type(unirender::nodes::ve
 		return ccl::NodeVectorTransformType::NODE_VECTOR_TRANSFORM_TYPE_NORMAL;
 	};
 	static_assert(umath::to_integral(unirender::nodes::vector_transform::Type::Count) == 4);
+	// Unreachable
+	return {};
 }
 ccl::NodeVectorMathType unirender::cycles::to_ccl_type(unirender::nodes::vector_math::MathType type)
 {
@@ -169,6 +173,8 @@ ccl::NodeVectorMathType unirender::cycles::to_ccl_type(unirender::nodes::vector_
 	};
 	static_assert(umath::to_integral(unirender::nodes::vector_math::MathType::Add) == ccl::NodeVectorMathType::NODE_VECTOR_MATH_ADD && umath::to_integral(unirender::nodes::vector_math::MathType::Maximum) == ccl::NodeVectorMathType::NODE_VECTOR_MATH_MAXIMUM);
 	static_assert(umath::to_integral(unirender::nodes::vector_math::MathType::Count) == 20);
+	// Unreachable
+	return {};
 }
 
 ccl::ustring unirender::cycles::to_ccl_type(unirender::ColorSpace space)
@@ -180,6 +186,8 @@ ccl::ustring unirender::cycles::to_ccl_type(unirender::ColorSpace space)
 		return ccl::u_colorspace_srgb;
 	}
 	static_assert(umath::to_integral(unirender::ColorSpace::Count) == 3);
+	// Unreachable
+	return {};
 }
 
 ccl::NodeEnvironmentProjection unirender::cycles::to_ccl_type(unirender::EnvironmentProjection projection)
@@ -192,6 +200,8 @@ ccl::NodeEnvironmentProjection unirender::cycles::to_ccl_type(unirender::Environ
 	}
 	static_assert(umath::to_integral(unirender::EnvironmentProjection::Equirectangular) == ccl::NodeEnvironmentProjection::NODE_ENVIRONMENT_EQUIRECTANGULAR && umath::to_integral(unirender::EnvironmentProjection::MirrorBall) == ccl::NodeEnvironmentProjection::NODE_ENVIRONMENT_MIRROR_BALL);
 	static_assert(umath::to_integral(unirender::EnvironmentProjection::Count) == 2);
+	// Unreachable
+	return {};
 }
 
 ccl::ClosureType unirender::cycles::to_ccl_type(unirender::ClosureType type)
@@ -206,6 +216,8 @@ ccl::ClosureType unirender::cycles::to_ccl_type(unirender::ClosureType type)
 	}
 	static_assert(umath::to_integral(unirender::EnvironmentProjection::Equirectangular) == ccl::NodeEnvironmentProjection::NODE_ENVIRONMENT_EQUIRECTANGULAR && umath::to_integral(unirender::EnvironmentProjection::MirrorBall) == ccl::NodeEnvironmentProjection::NODE_ENVIRONMENT_MIRROR_BALL);
 	static_assert(umath::to_integral(unirender::ClosureType::Count) == 4);
+	// Unreachable
+	return {};
 }
 
 ccl::ImageAlphaType unirender::cycles::to_ccl_type(unirender::nodes::image_texture::AlphaType type)
@@ -224,6 +236,8 @@ ccl::ImageAlphaType unirender::cycles::to_ccl_type(unirender::nodes::image_textu
 	}
 	static_assert(umath::to_integral(unirender::nodes::image_texture::AlphaType::Unassociated) == ccl::ImageAlphaType::IMAGE_ALPHA_UNASSOCIATED && umath::to_integral(unirender::nodes::image_texture::AlphaType::Auto) == ccl::ImageAlphaType::IMAGE_ALPHA_AUTO);
 	static_assert(umath::to_integral(unirender::nodes::image_texture::AlphaType::Count) == 5);
+	// Unreachable
+	return {};
 }
 
 ccl::InterpolationType unirender::cycles::to_ccl_type(unirender::nodes::image_texture::InterpolationType type)
@@ -240,6 +254,8 @@ ccl::InterpolationType unirender::cycles::to_ccl_type(unirender::nodes::image_te
 	}
 	static_assert(umath::to_integral(unirender::nodes::image_texture::InterpolationType::Linear) == ccl::InterpolationType::INTERPOLATION_LINEAR && umath::to_integral(unirender::nodes::image_texture::InterpolationType::Smart) == ccl::InterpolationType::INTERPOLATION_SMART);
 	static_assert(umath::to_integral(unirender::nodes::image_texture::InterpolationType::Count) == 4);
+	// Unreachable
+	return {};
 }
 
 ccl::ExtensionType unirender::cycles::to_ccl_type(unirender::nodes::image_texture::ExtensionType type)
@@ -254,6 +270,8 @@ ccl::ExtensionType unirender::cycles::to_ccl_type(unirender::nodes::image_textur
 	}
 	static_assert(umath::to_integral(unirender::nodes::image_texture::ExtensionType::Repeat) == ccl::ExtensionType::EXTENSION_REPEAT && umath::to_integral(unirender::nodes::image_texture::ExtensionType::Clip) == ccl::ExtensionType::EXTENSION_CLIP);
 	static_assert(umath::to_integral(unirender::nodes::image_texture::ExtensionType::Count) == 3);
+	// Unreachable
+	return {};
 }
 
 ccl::NodeImageProjection unirender::cycles::to_ccl_type(unirender::nodes::image_texture::Projection type)
@@ -270,6 +288,8 @@ ccl::NodeImageProjection unirender::cycles::to_ccl_type(unirender::nodes::image_
 	}
 	static_assert(umath::to_integral(unirender::nodes::image_texture::Projection::Flat) == ccl::NodeImageProjection::NODE_IMAGE_PROJ_FLAT && umath::to_integral(unirender::nodes::image_texture::Projection::Tube) == ccl::NodeImageProjection::NODE_IMAGE_PROJ_TUBE);
 	static_assert(umath::to_integral(unirender::nodes::image_texture::Projection::Count) == 4);
+	// Unreachable
+	return {};
 }
 
 ccl::NodeMappingType unirender::cycles::to_ccl_type(unirender::nodes::mapping::Type type)
@@ -286,6 +306,8 @@ ccl::NodeMappingType unirender::cycles::to_ccl_type(unirender::nodes::mapping::T
 	}
 	static_assert(umath::to_integral(unirender::nodes::mapping::Type::Point) == ccl::NodeMappingType::NODE_MAPPING_TYPE_POINT && umath::to_integral(unirender::nodes::mapping::Type::Normal) == ccl::NodeMappingType::NODE_MAPPING_TYPE_NORMAL);
 	static_assert(umath::to_integral(unirender::nodes::mapping::Type::Count) == 4);
+	// Unreachable
+	return {};
 }
 
 ccl::NodeNormalMapSpace unirender::cycles::to_ccl_type(unirender::nodes::normal_map::Space space)
@@ -300,6 +322,8 @@ ccl::NodeNormalMapSpace unirender::cycles::to_ccl_type(unirender::nodes::normal_
 	}
 	static_assert(umath::to_integral(unirender::nodes::normal_map::Space::Tangent) == ccl::NodeNormalMapSpace::NODE_NORMAL_MAP_TANGENT && umath::to_integral(unirender::nodes::normal_map::Space::World) == ccl::NodeNormalMapSpace::NODE_NORMAL_MAP_WORLD);
 	static_assert(umath::to_integral(unirender::nodes::normal_map::Space::Count) == 3);
+	// Unreachable
+	return {};
 }
 
 ccl::NodeMix unirender::cycles::to_ccl_type(unirender::nodes::mix::Mix mix)
@@ -346,6 +370,8 @@ ccl::NodeMix unirender::cycles::to_ccl_type(unirender::nodes::mix::Mix mix)
 	}
 	static_assert(umath::to_integral(unirender::nodes::mix::Mix::Blend) == ccl::NodeMix::NODE_MIX_BLEND && umath::to_integral(unirender::nodes::mix::Mix::Clamp) == ccl::NodeMix::NODE_MIX_CLAMP);
 	static_assert(umath::to_integral(unirender::nodes::mix::Mix::Count) == 19);
+	// Unreachable
+	return {};
 }
 ccl::NodeVectorTransformConvertSpace unirender::cycles::to_ccl_type(unirender::nodes::vector_transform::ConvertSpace convertSpace)
 {
@@ -360,6 +386,8 @@ ccl::NodeVectorTransformConvertSpace unirender::cycles::to_ccl_type(unirender::n
 	static_assert(umath::to_integral(unirender::nodes::vector_transform::ConvertSpace::World) == ccl::NodeVectorTransformConvertSpace::NODE_VECTOR_TRANSFORM_CONVERT_SPACE_WORLD
 	  && umath::to_integral(unirender::nodes::vector_transform::ConvertSpace::Camera) == ccl::NodeVectorTransformConvertSpace::NODE_VECTOR_TRANSFORM_CONVERT_SPACE_CAMERA);
 	static_assert(umath::to_integral(unirender::nodes::vector_transform::ConvertSpace::Count) == 3);
+	// Unreachable
+	return {};
 }
 std::shared_ptr<unirender::CCLShader> unirender::CCLShader::Create(cycles::Renderer &renderer, ccl::Shader &cclShader, const GroupNodeDesc &desc, bool useCache)
 {
