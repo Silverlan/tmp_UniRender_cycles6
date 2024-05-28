@@ -1,198 +1,40 @@
-cmake_minimum_required(VERSION 3.12)
-
-set(INCLUDE_DIRS)
-function(add_include_dir IDENTIFIER)
-	set(PRETTYNAME ${IDENTIFIER})
-	set(ARGV ${ARGN})
-	list(LENGTH ARGV ARGC)
-	if(${ARGC} GREATER 0)
-		list(GET ARGV 0 PRETTYNAME)
-	endif()
-	string(TOUPPER ${IDENTIFIER} UIDENTIFIER)
-
-	set(${DEFAULT_DIR} "")
-	set(DEPENDENCY_${UIDENTIFIER}_INCLUDE ${DEFAULT_DIR} CACHE PATH "Path to ${PRETTYNAME} include directory.")
-	set(INCLUDE_DIRS ${INCLUDE_DIRS} DEPENDENCY_${UIDENTIFIER}_INCLUDE PARENT_SCOPE)
-endfunction(add_include_dir)
-
-set(LIBRARIES)
-function(add_external_library IDENTIFIER)
-	set(PRETTYNAME ${IDENTIFIER})
-	set(ARGV ${ARGN})
-	list(LENGTH ARGV ARGC)
-	if(${ARGC} GREATER 0)
-		list(GET ARGV 0 PRETTYNAME)
-	endif()
-	string(TOUPPER ${IDENTIFIER} UIDENTIFIER)
-
-	set(DEPENDENCY_${UIDENTIFIER}_LIBRARY "" CACHE FILEPATH "Path to ${PRETTYNAME} library.")
-	set(LIBRARIES ${LIBRARIES} DEPENDENCY_${UIDENTIFIER}_LIBRARY PARENT_SCOPE)
-endfunction(add_external_library)
-
-function(link_external_library IDENTIFIER)
-	set(PRETTYNAME ${IDENTIFIER})
-	set(ARGV ${ARGN})
-	list(LENGTH ARGV ARGC)
-	if(${ARGC} GREATER 0)
-		list(GET ARGV 0 PRETTYNAME)
-	endif()
-	string(TOUPPER ${IDENTIFIER} UIDENTIFIER)
-
-	set(${DEFAULT_DIR} "")
-	set(DEPENDENCY_${UIDENTIFIER}_INCLUDE ${DEFAULT_DIR} CACHE PATH "Path to ${PRETTYNAME} include directory.")
-	set(INCLUDE_DIRS ${INCLUDE_DIRS} DEPENDENCY_${UIDENTIFIER}_INCLUDE PARENT_SCOPE)
-
-	set(DEPENDENCY_${UIDENTIFIER}_LIBRARY "" CACHE FILEPATH "Path to ${PRETTYNAME} library.")
-	set(LIBRARIES ${LIBRARIES} DEPENDENCY_${UIDENTIFIER}_LIBRARY PARENT_SCOPE)
-endfunction(link_external_library)
-
-set(DEFINITIONS)
-function(add_def DEF)
-	set(DEFINITIONS ${DEFINITIONS} ${DEF} PARENT_SCOPE)
-endfunction(add_def)
+include(${CMAKE_SOURCE_DIR}/cmake/pr_common.cmake)
 
 set(UNIRENDER_CYCLES_ENABLE_DEPENDENCIES 1 CACHE BOOL "Enable project dependencies?")
 
-##### CONFIGURATION #####
-
 set(PROJ_NAME UniRender_cycles)
+pr_add_library(${PROJ_NAME} SHARED)
 
-project(${PROJ_NAME} CXX)
+pr_add_dependency(${PROJ_NAME} util_raytracing TARGET PUBLIC)
 
-set(CMAKE_CXX_STANDARD 20)
-set(ENABLE_STATIC_LIBRARY_FLAG 0)
+pr_add_headers(${PROJ_NAME} "include/")
+pr_add_sources(${PROJ_NAME} "src/")
 
-link_external_library(util_image)
-link_external_library(util_raytracing)
-link_external_library(sharedutils)
-link_external_library(mathutil)
-link_external_library(vfilesystem)
-link_external_library(cycles_tbb)
-link_external_library(cycles_glog)
-link_external_library(util_udm)
-link_external_library(gflags)
-link_external_library(spdlog)
+pr_add_external_dependency(${PROJ_NAME} cycles INCLUDE PUBLIC)
+pr_add_external_dependency(${PROJ_NAME} cycles_atomic INCLUDE PUBLIC)
+pr_add_external_dependency(${PROJ_NAME} cycles_pugixml INCLUDE PUBLIC)
+pr_add_external_dependency(${PROJ_NAME} cycles_openimageio INCLUDE PUBLIC)
+pr_add_external_dependency(${PROJ_NAME} cycles_openimagedenoise INCLUDE PUBLIC)
+pr_add_external_dependency(${PROJ_NAME} cycles_openexr INCLUDE PUBLIC)
+pr_add_external_dependency(${PROJ_NAME} cycles_embree INCLUDE PUBLIC)
 
-add_include_dir(cycles)
-add_include_dir(cycles_atomic)
-add_include_dir(cycles_pugixml)
-add_include_dir(cycles_openimageio)
-add_include_dir(cycles_openimagedenoise)
-add_include_dir(cycles_openexr)
-add_include_dir(cycles_embree)
-# add_include_dir(cycles_osl)
-add_include_dir(glm)
-add_external_library(glew)
-add_external_library(tiff)
-add_external_library(lpng)
-add_external_library(zlib)
-add_external_library(jpeg)
-add_external_library(lz4)
-
-# Required for color management
-link_external_library(util_ocio)
-#
-
-set(DEPENDENCY_CYCLES_LIBRARY_LOCATION "" CACHE FILEPATH "Path to cycles libraries.")
-set(DEPENDENCY_CYCLES_DEPENDENCIES_LOCATION "" CACHE FILEPATH "Path to cycles dependencies.")
-set(DEPENDENCY_OPENEXR_LIBRARY_LOCATION "" CACHE FILEPATH "Path to openexr libraries.")
-add_def(OIIO_STATIC_BUILD)
-add_def(GLEW_STATIC)
-add_def(WITH_SYSTEM_PUGIXML)
-add_def(OIIO_STATIC_BUILD)
-add_def(OIIO_STATIC_DEFINE)
-# add_def(WITH_OSL)
-# add_def(OSL_STATIC_BUILD)
-# add_def(OSL_STATIC_LIBRARY)
-add_def(WITH_OPTIX)
-add_def(WITH_EMBREE)
-add_def(WITH_OPENSUBDIV)
-add_def(WITH_OPENIMAGEDENOISE)
-add_def(OIDN_STATIC_LIB)
-if(WIN32)
-	add_def(WITH_CYCLES_LOGGING)
-endif()
-add_def(GLOG_NO_ABBREVIATED_SEVERITIES)
-add_def(GOOGLE_GLOG_DLL_DECL=__declspec\(dllexport\))
-add_def("CCL_NAMESPACE_BEGIN=namespace ccl {")
-add_def("CCL_NAMESPACE_END=}")
-
-link_external_library(openexr_imath)
-add_external_library(openexr_iex)
-add_external_library(openexr_ilmthread)
-add_external_library(openexr)
-add_external_library(openexr_core)
-add_external_library(openexr_util)
-
-##### CONFIGURATION #####
-
-set(LIB_TYPE SHARED)
-
-foreach(def IN LISTS DEFINITIONS)
-	add_definitions(-D${def})
-endforeach(def)
-
-function(def_vs_filters FILE_LIST)
-	foreach(source IN LISTS FILE_LIST)
-	    get_filename_component(source_path "${source}" PATH)
-	    string(REPLACE "${CMAKE_CURRENT_LIST_DIR}" "" source_path_relative "${source_path}")
-	    string(REPLACE "/" "//" source_path_msvc "${source_path_relative}")
-	    source_group("${source_path_msvc}" FILES "${source}")
-	endforeach()
-endfunction(def_vs_filters)
-
-file(GLOB_RECURSE SRC_FILES
-    "${CMAKE_CURRENT_LIST_DIR}/src/*.h"
-    "${CMAKE_CURRENT_LIST_DIR}/src/*.hpp"
-    "${CMAKE_CURRENT_LIST_DIR}/src/*.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/src/*.c"
-    "${CMAKE_CURRENT_LIST_DIR}/include/*.h"
-    "${CMAKE_CURRENT_LIST_DIR}/include/*.hpp"
-)
-add_library(${PROJ_NAME} ${LIB_TYPE} ${SRC_FILES})
-if(WIN32)
-	target_compile_options(${PROJ_NAME} PRIVATE /wd4251)
-	target_compile_options(${PROJ_NAME} PRIVATE /wd4996)
-endif()
-def_vs_filters("${SRC_FILES}")
-
-foreach(LIB IN LISTS LIBRARIES)
-	target_link_libraries(${PROJ_NAME} ${${LIB}})
-endforeach(LIB)
-
-target_include_directories(${PROJ_NAME} PRIVATE ${CMAKE_CURRENT_LIST_DIR}/include)
-target_include_directories(${PROJ_NAME} PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)
-
-foreach(INCLUDE_PATH IN LISTS INCLUDE_DIRS)
-	target_include_directories(${PROJ_NAME} PRIVATE ${${INCLUDE_PATH}})
-endforeach(INCLUDE_PATH)
-
-set(TARGET_PROPERTIES LINKER_LANGUAGE CXX)
-if(DEFINED PRECOMPILED_HEADER)
-	include(PrecompiledHeader.cmake)
-	add_precompiled_header(${PROJ_NAME} "src/${PRECOMPILED_HEADER}.h" c++17 FORCEINCLUDE)
-endif()
-set_target_properties(${PROJ_NAME} PROPERTIES ${TARGET_PROPERTIES})
+pr_add_compile_definitions(${PROJ_NAME} -DOIIO_STATIC_BUILD -DOIIO_STATIC_DEFINE -DGLEW_STATIC -DWITH_SYSTEM_PUGIXML PUBLIC)
+pr_add_compile_definitions(${PROJ_NAME} -DWITH_OPTIX -DWITH_EMBREE -DWITH_OPENSUBDIV -DWITH_OPENIMAGEDENOISE -DOIDN_STATIC_LIB PUBLIC)
+pr_add_compile_definitions(${PROJ_NAME} -DCCL_NAMESPACE_BEGIN=namespace\ ccl\ { PUBLIC)
+pr_add_compile_definitions(${PROJ_NAME} -DCCL_NAMESPACE_END=} PUBLIC)
 
 if(WIN32)
-	target_link_libraries(${PROJ_NAME}
+	pr_add_compile_definitions(${PROJ_NAME} -DWITH_CYCLES_LOGGING)
+endif()
+pr_add_compile_definitions(${PROJ_NAME} -DGLOG_NO_ABBREVIATED_SEVERITIES -DGOOGLE_GLOG_DLL_DECL=__declspec\(dllexport\))
+
+if(WIN32)
+	target_link_libraries(${PROJ_NAME} PUBLIC
 		opengl32
 		glu32
 		version
 		shlwapi
 	)
-endif()
-
-if(${UNIRENDER_CYCLES_ENABLE_DEPENDENCIES})
-	add_dependencies(${PROJ_NAME} util_udm util_raytracing spdlog)
-endif()
-
-if(WIN32)
-	set(LIB_PREFIX "")
-	set(LIB_EXT ".lib")
-else()
-	set(LIB_PREFIX "lib")
-	set(LIB_EXT ".a")
 endif()
 
 set(DEPENDENCY_CYCLES_UTIL_LIBRARY ${DEPENDENCY_CYCLES_LIBRARY_LOCATION}/${LIB_PREFIX}cycles_util${LIB_EXT} CACHE PATH "Path to library." FORCE)
@@ -203,18 +45,9 @@ set(DEPENDENCY_CYCLES_SUBD_LIBRARY ${DEPENDENCY_CYCLES_LIBRARY_LOCATION}/${LIB_P
 set(DEPENDENCY_CYCLES_BVH_LIBRARY ${DEPENDENCY_CYCLES_LIBRARY_LOCATION}/${LIB_PREFIX}cycles_bvh${LIB_EXT} CACHE PATH "Path to library." FORCE)
 set(DEPENDENCY_CYCLES_CUEW_LIBRARY ${DEPENDENCY_CYCLES_LIBRARY_LOCATION}/${LIB_PREFIX}extern_cuew${LIB_EXT} CACHE PATH "Path to library." FORCE)
 set(DEPENDENCY_CYCLES_INTEGRATOR_LIBRARY ${DEPENDENCY_CYCLES_LIBRARY_LOCATION}/${LIB_PREFIX}cycles_integrator${LIB_EXT} CACHE PATH "Path to library." FORCE)
-# set(DEPENDENCY_CYCLES_KERNEL_OSL_LIBRARY ${DEPENDENCY_CYCLES_LIBRARY_LOCATION}/${LIB_PREFIX}cycles_kernel_osl${LIB_EXT} CACHE PATH "Path to library." FORCE)
 set(DEPENDENCY_CYCLES_SCENE_LIBRARY ${DEPENDENCY_CYCLES_LIBRARY_LOCATION}/${LIB_PREFIX}cycles_scene${LIB_EXT} CACHE PATH "Path to library." FORCE)
 set(DEPENDENCY_CYCLES_SESSION_LIBRARY ${DEPENDENCY_CYCLES_LIBRARY_LOCATION}/${LIB_PREFIX}cycles_session${LIB_EXT} CACHE PATH "Path to library." FORCE)
 set(DEPENDENCY_CYCLES_SKY_LIBRARY ${DEPENDENCY_CYCLES_LIBRARY_LOCATION}/${LIB_PREFIX}extern_sky${LIB_EXT} CACHE PATH "Path to library." FORCE)
-
-# set(DEPENDENCY_OPENEXR_HALF_LIBRARY ${DEPENDENCY_OPENEXR_LIBRARY_LOCATION}/${LIB_PREFIX}Half-2_3_static${LIB_EXT} CACHE PATH "Path to library." FORCE)
-# set(DEPENDENCY_OPENEXR_IEX_LIBRARY ${DEPENDENCY_OPENEXR_LIBRARY_LOCATION}/${LIB_PREFIX}Iex-2_3_static${LIB_EXT} CACHE PATH "Path to library." FORCE)
-# set(DEPENDENCY_OPENEXR_IEX_MATH_LIBRARY ${DEPENDENCY_OPENEXR_LIBRARY_LOCATION}/${LIB_PREFIX}IexMath-2_3_static${LIB_EXT} CACHE PATH "Path to library." FORCE)
-# set(DEPENDENCY_OPENEXR_ILM_IMF_LIBRARY ${DEPENDENCY_OPENEXR_LIBRARY_LOCATION}/${LIB_PREFIX}IlmImf-2_3_static${LIB_EXT} CACHE PATH "Path to library." FORCE)
-# set(DEPENDENCY_OPENEXR_ILM_IMF_UTIL ${DEPENDENCY_OPENEXR_LIBRARY_LOCATION}/${LIB_PREFIX}IlmImfUtil-2_3_static${LIB_EXT} CACHE PATH "Path to library." FORCE)
-# set(DEPENDENCY_OPENEXR_ILM_THREAD ${DEPENDENCY_OPENEXR_LIBRARY_LOCATION}/${LIB_PREFIX}IlmThread-2_3_static${LIB_EXT} CACHE PATH "Path to library." FORCE)
-# set(DEPENDENCY_OPENEXR_IMATH ${DEPENDENCY_OPENEXR_LIBRARY_LOCATION}/${LIB_PREFIX}Imath-2_3_static${LIB_EXT} CACHE PATH "Path to library." FORCE)
 
 if(WIN32)
     set(LIBYAML_NAME "libyaml-cpp")
@@ -262,11 +95,6 @@ set(CYCLES_LIB_BOOST_OPENEXR_UTIL "${DEPENDENCY_CYCLES_DEPENDENCIES_LOCATION}/op
 
 if(UNIX)
 	set(CYCLES_SHARED_INSTALL_LIBS
-		# ${CYCLES_LIB_OSL_COMP}
-		# ${CYCLES_LIB_OSL_EXEC}
-		# ${CYCLES_LIB_OSL_NOISE}
-		# ${CYCLES_LIB_OSL_QUERY}
-
 		${CYCLES_LIB_OPENVDB}
 		${CYCLES_LIB_OIIO}
 		${CYCLES_LIB_OIIO_UTIL}
@@ -291,10 +119,6 @@ if(UNIX)
 endif()
 
 SET(CYCLES_LIBRARIES
-	# ${CYCLES_LIB_OSL_COMP}
-	# ${CYCLES_LIB_OSL_EXEC}
-	# ${CYCLES_LIB_OSL_NOISE}
-	# ${CYCLES_LIB_OSL_QUERY}
 	${DEPENDENCY_CYCLES_DEPENDENCIES_LOCATION}/llvm/lib/${LIB_PREFIX}LLVMAggressiveInstCombine${LIB_EXT}
 	${DEPENDENCY_CYCLES_DEPENDENCIES_LOCATION}/llvm/lib/${LIB_PREFIX}LLVMAnalysis${LIB_EXT}
 	${DEPENDENCY_CYCLES_DEPENDENCIES_LOCATION}/llvm/lib/${LIB_PREFIX}LLVMAsmParser${LIB_EXT}
@@ -439,7 +263,6 @@ SET(CYCLES_LIBRARIES
 	${DEPENDENCY_CYCLES_BVH_LIBRARY}
 	${DEPENDENCY_CYCLES_CUEW_LIBRARY}
 	${DEPENDENCY_CYCLES_INTEGRATOR_LIBRARY}
-	# ${DEPENDENCY_CYCLES_KERNEL_OSL_LIBRARY}
 	${DEPENDENCY_CYCLES_SCENE_LIBRARY}
 	${DEPENDENCY_CYCLES_SESSION_LIBRARY}
 	${DEPENDENCY_CYCLES_SKY_LIBRARY}
@@ -495,19 +318,20 @@ else()
 		${CYCLES_LIB_BOOST_OPENEXR}
 		${CYCLES_LIB_BOOST_OPENEXR_CORE}
 		${CYCLES_LIB_BOOST_OPENEXR_UTIL}
-
-		# ${DEPENDENCY_CYCLES_DEPENDENCIES_LOCATION}/opencolorio/lib/${LIB_PREFIX}expat${LIB_EXT}
 	)
 endif()
 
-target_link_libraries(${PROJ_NAME} ${CYCLES_LIBRARIES})
+target_link_libraries(${PROJ_NAME} PRIVATE ${CYCLES_LIBRARIES})
 if(UNIX)
 	# Link a few more times on Linux so we don't have to bother trying to find the right linking order...
-	target_link_libraries(${PROJ_NAME} ${CYCLES_LIBRARIES})
+	target_link_libraries(${PROJ_NAME} PRIVATE ${CYCLES_LIBRARIES})
 	
 	foreach(LIB IN LISTS LIBRARIES)
-		target_link_libraries(${PROJ_NAME} ${${LIB}})
+		target_link_libraries(${PROJ_NAME} PRIVATE ${${LIB}})
 	endforeach(LIB)
 	
-	target_link_libraries(${PROJ_NAME} ${CYCLES_LIBRARIES})
+	target_link_libraries(${PROJ_NAME} PRIVATE ${CYCLES_LIBRARIES})
 endif()
+
+pr_finalize(${PROJ_NAME})
+
