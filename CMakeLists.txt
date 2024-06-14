@@ -2,6 +2,9 @@ include(${CMAKE_SOURCE_DIR}/cmake/pr_common.cmake)
 
 set(UNIRENDER_CYCLES_ENABLE_DEPENDENCIES 1 CACHE BOOL "Enable project dependencies?")
 
+set(DEPENDENCY_CYCLES_LIBRARY_LOCATION "" CACHE FILEPATH "Path to cycles libraries.")
+set(DEPENDENCY_CYCLES_DEPENDENCIES_LOCATION "" CACHE FILEPATH "Path to cycles dependencies.")
+
 set(PROJ_NAME UniRender_cycles)
 pr_add_library(${PROJ_NAME} SHARED)
 
