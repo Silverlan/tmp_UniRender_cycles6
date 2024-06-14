@@ -15,22 +15,22 @@ pr_add_sources(${PROJ_NAME} "src/")
 
 pr_add_external_dependency(${PROJ_NAME} spdlog LIBRARY PUBLIC)
 
-pr_add_external_dependency(${PROJ_NAME} cycles INCLUDE PUBLIC)
-pr_add_external_dependency(${PROJ_NAME} cycles_atomic INCLUDE PUBLIC)
-pr_add_external_dependency(${PROJ_NAME} cycles_pugixml INCLUDE PUBLIC)
-pr_add_external_dependency(${PROJ_NAME} cycles_openimageio INCLUDE PUBLIC)
-pr_add_external_dependency(${PROJ_NAME} cycles_openimagedenoise INCLUDE PUBLIC)
-pr_add_external_dependency(${PROJ_NAME} cycles_openexr INCLUDE PUBLIC)
-pr_add_external_dependency(${PROJ_NAME} cycles_embree INCLUDE PUBLIC)
-pr_add_external_dependency(${PROJ_NAME} cycles_tbb LIBRARY PUBLIC)
-pr_add_external_dependency(${PROJ_NAME} cycles_glog LIBRARY PUBLIC)
-pr_add_external_dependency(${PROJ_NAME} gflags LIBRARY PUBLIC)
-pr_add_external_dependency(${PROJ_NAME} glew LIBRARY PUBLIC)
-pr_add_external_dependency(${PROJ_NAME} tiff LIBRARY PUBLIC)
-pr_add_external_dependency(${PROJ_NAME} lpng LIBRARY PUBLIC)
-pr_add_external_dependency(${PROJ_NAME} zlib LIBRARY PUBLIC)
-pr_add_external_dependency(${PROJ_NAME} jpeg LIBRARY PUBLIC)
-pr_add_external_dependency(${PROJ_NAME} lz4 LIBRARY PUBLIC)
+pr_add_external_dependency(${PROJ_NAME} cycles INCLUDE)
+pr_add_external_dependency(${PROJ_NAME} cycles_atomic INCLUDE)
+pr_add_external_dependency(${PROJ_NAME} cycles_pugixml INCLUDE)
+pr_add_external_dependency(${PROJ_NAME} cycles_openimageio INCLUDE)
+pr_add_external_dependency(${PROJ_NAME} cycles_openimagedenoise INCLUDE)
+pr_add_external_dependency(${PROJ_NAME} cycles_openexr INCLUDE)
+pr_add_external_dependency(${PROJ_NAME} cycles_embree INCLUDE)
+pr_add_external_dependency(${PROJ_NAME} cycles_tbb LIBRARY)
+pr_add_external_dependency(${PROJ_NAME} cycles_glog LIBRARY)
+pr_add_external_dependency(${PROJ_NAME} gflags LIBRARY)
+pr_add_external_dependency(${PROJ_NAME} glew LIBRARY)
+pr_add_external_dependency(${PROJ_NAME} tiff LIBRARY)
+pr_add_external_dependency(${PROJ_NAME} lpng LIBRARY)
+pr_add_external_dependency(${PROJ_NAME} zlib LIBRARY)
+pr_add_external_dependency(${PROJ_NAME} jpeg LIBRARY)
+pr_add_external_dependency(${PROJ_NAME} lz4 LIBRARY)
 
 pr_add_external_dependency(${PROJ_NAME} openexr_imath LIBRARY)
 pr_add_external_dependency(${PROJ_NAME} openexr_iex LINK_ONLY)
@@ -50,7 +50,7 @@ endif()
 pr_add_compile_definitions(${PROJ_NAME} -DGLOG_NO_ABBREVIATED_SEVERITIES -DGOOGLE_GLOG_DLL_DECL=__declspec\(dllexport\))
 
 if(WIN32)
-	target_link_libraries(${PROJ_NAME} PUBLIC
+	target_link_libraries(${PROJ_NAME} PRIVATE
 		opengl32
 		glu32
 		version
