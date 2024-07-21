@@ -14,6 +14,10 @@ concurrency:
 permissions:
   contents: write
 
+env:
+  # See https://github.com/git-lfs/git-lfs/issues/5749
+  GIT_CLONE_PROTECTION_ACTIVE: 'false'
+
 jobs:
   build:
     name: Build - ${{ matrix.config.os }}
@@ -24,24 +28,16 @@ jobs:
         config:
           - os: windows-latest
             name: "Windows x64 MSVC"
-            artifact: "Windows-MSVC.tar.xz"
-            build_type: "RelWithDebInfo"
-            environment_script: "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/VC/Auxiliary/Build/vcvars64.bat"
-            cc: "cl"
-            cxx: "cl"
-            archiver: "7z a"
-            generators: "Visual Studio 16 2022"
-            build_dir: 'build'
     steps:
       - name: Setup Pragma
-        uses: Silverlan/pragma/github_actions/setup@master
+        uses: Silverlan/pragma/github_actions/setup@main
         
       - uses: actions/setup-python@v4
         with:
           python-version: '3.11'
         
       - name: Build Dependencies
-        uses: Silverlan/pragma/github_actions/build@master
+        uses: Silverlan/pragma/github_actions/build@main
         id: build-deps
         with:
           # This will build the core dependencies, as well as cycles, but not Pragma
