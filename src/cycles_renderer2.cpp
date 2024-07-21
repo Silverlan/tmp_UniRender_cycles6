@@ -965,8 +965,6 @@ static std::optional<ccl::PassType> pass_type_to_ccl_pass_type(unirender::PassTy
 		return ccl::PassType::PASS_BACKGROUND;
 	case unirender::PassType::Ao:
 		return ccl::PassType::PASS_AO;
-	case unirender::PassType::Shadow:
-		return ccl::PassType::PASS_SHADOW;
 	case unirender::PassType::Diffuse:
 		return ccl::PassType::PASS_DIFFUSE;
 	case unirender::PassType::DiffuseDirect:
@@ -1004,7 +1002,7 @@ static std::optional<ccl::PassType> pass_type_to_ccl_pass_type(unirender::PassTy
 	case unirender::PassType::TransmissionColor:
 		return ccl::PassType::PASS_TRANSMISSION_COLOR;
 	}
-	static_assert(umath::to_integral(unirender::PassType::Count) == 26, "Update this implementation when new types are added!");
+	static_assert(umath::to_integral(unirender::PassType::Count) == 25, "Update this implementation when new types are added!");
 	return {};
 }
 

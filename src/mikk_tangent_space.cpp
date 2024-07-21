@@ -218,7 +218,7 @@ void unirender::cycles::compute_tangents(
 	  attr = attributes.find(ccl::ATTR_STD_UV_TANGENT);
   }
   else {
-    attr = attributes.add(name, ccl::TypeDesc::TypeVector, ccl::ATTR_ELEMENT_CORNER);
+    attr = attributes.add(name, ccl::TypeVector, ccl::ATTR_ELEMENT_CORNER);
   }
   ccl::float3 *tangent = attr->data_float3();
   /* Create bitangent sign attribute. */
@@ -238,7 +238,7 @@ void unirender::cycles::compute_tangents(
       attr_sign = attributes.find(ccl::ATTR_STD_UV_TANGENT_SIGN);
     }
     else {
-      attr_sign = attributes.add(name_sign, ccl::TypeDesc::TypeFloat, ccl::ATTR_ELEMENT_CORNER);
+      attr_sign = attributes.add(name_sign, ccl::TypeFloat, ccl::ATTR_ELEMENT_CORNER);
     }
     tangent_sign = attr_sign->data_float();
   }

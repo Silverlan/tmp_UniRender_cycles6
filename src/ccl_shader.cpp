@@ -365,11 +365,13 @@ ccl::NodeMix unirender::cycles::to_ccl_type(unirender::nodes::mix::Mix mix)
 		return ccl::NodeMix::NODE_MIX_SOFT;
 	case unirender::nodes::mix::Mix::Linear:
 		return ccl::NodeMix::NODE_MIX_LINEAR;
+	case unirender::nodes::mix::Mix::Exclusion:
+		return ccl::NodeMix::NODE_MIX_EXCLUSION;
 	case unirender::nodes::mix::Mix::Clamp:
 		return ccl::NodeMix::NODE_MIX_CLAMP;
 	}
 	static_assert(umath::to_integral(unirender::nodes::mix::Mix::Blend) == ccl::NodeMix::NODE_MIX_BLEND && umath::to_integral(unirender::nodes::mix::Mix::Clamp) == ccl::NodeMix::NODE_MIX_CLAMP);
-	static_assert(umath::to_integral(unirender::nodes::mix::Mix::Count) == 19);
+	static_assert(umath::to_integral(unirender::nodes::mix::Mix::Count) == 20);
 	// Unreachable
 	return {};
 }

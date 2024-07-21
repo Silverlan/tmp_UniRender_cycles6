@@ -56,13 +56,6 @@
 #include <Shlobj.h>
 #endif
 
-#ifdef __linux__
-#include <OpenImageIO/ustring.h>
-// This fixes an odd missing symbol issue
-// May have something to do with this: https://github.com/OpenImageIO/oiio/pull/1176/commits/a2ccfad7c4962a5203ea2cf755fd102b4c67f997
-std::string ccl::ustring::empty_std_string;
-#endif
-
 static std::optional<std::string> KERNEL_PATH {};
 void unirender::Scene::SetKernelPath(const std::string &kernelPath) { KERNEL_PATH = kernelPath; }
 int cycles_standalone_test(int argc, const char **argv, bool initPaths);
@@ -889,6 +882,7 @@ void unirender::cycles::Renderer::SyncLight(unirender::Scene &scene, const unire
 		break;
 	}
 
+	auto pose = ToCyclesTransform(light.GetPose(), true);
 	switch(light.GetType()) {
 	case unirender::Light::Type::Point:
 		{
@@ -897,34 +891,24 @@ void unirender::cycles::Renderer::SyncLight(unirender::Scene &scene, const unire
 	case unirender::Light::Type::Spot:
 		{
 			auto &rot = light.GetRotation();
-			auto forward = uquat::forward(rot);
-			cclLight->set_dir(ToCyclesNormal(forward));
 			cclLight->set_spot_smooth(light.GetBlendFraction());
 			cclLight->set_spot_angle(umath::deg_to_rad(light.GetOuterConeAngle()));
 			break;
 		}
 	case unirender::Light::Type::Directional:
-		{
-			auto &rot = light.GetRotation();
-			auto forward = uquat::forward(rot);
-			cclLight->set_dir(ToCyclesNormal(forward));
-			break;
-		}
+		break;
 	case unirender::Light::Type::Area:
 		{
 			auto &axisU = light.GetAxisU();
 			auto &axisV = light.GetAxisV();
 			auto sizeU = light.GetSizeU();
 			auto sizeV = light.GetSizeV();
-			cclLight->set_axisu(ToCyclesNormal(axisU));
-			cclLight->set_axisv(ToCyclesNormal(axisV));
+
+			ccl::transform_set_column(&pose, 0, ToCyclesNormal(axisU));
+			ccl::transform_set_column(&pose, 1, ToCyclesNormal(axisV));
 			cclLight->set_sizeu(ToCyclesLength(sizeU));
 			cclLight->set_sizev(ToCyclesLength(sizeV));
-			cclLight->set_round(light.IsRound());
-
-			auto &rot = light.GetRotation();
-			auto forward = uquat::forward(rot);
-			cclLight->set_dir(ToCyclesNormal(forward));
+			cclLight->set_ellipse(light.IsRound());
 			break;
 		}
 	case unirender::Light::Type::Background:
@@ -960,7 +944,7 @@ void unirender::cycles::Renderer::SyncLight(unirender::Scene &scene, const unire
 	auto &color = light.GetColor();
 	cclLight->set_strength(ccl::float3 {color.r, color.g, color.b} * watt);
 	cclLight->set_size(ToCyclesLength(light.GetSize()));
-	cclLight->set_co(ToCyclesPosition(light.GetPos()));
+	cclLight->set_tfm(pose);
 
 	cclLight->set_max_bounces(1'024);
 	cclLight->set_map_resolution(2'048);
@@ -1309,7 +1293,7 @@ void unirender::cycles::Renderer::AddDebugLight()
 	light->set_light_type(ccl::LightType::LIGHT_POINT);
 	light->set_shader(shader);
 	light->set_size(1.f);
-	light->set_co({0.f, 0.f, 1.f});
+	light->set_tfm(ccl::transform_translate({0.f, 0.f, 1.f}));
 }
 ccl::Shader *unirender::cycles::Renderer::AddDebugShader()
 {
