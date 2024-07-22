@@ -882,7 +882,6 @@ void unirender::cycles::Renderer::SyncLight(unirender::Scene &scene, const unire
 		break;
 	}
 
-	auto pose = ToCyclesTransform(light.GetPose(), true);
 	switch(light.GetType()) {
 	case unirender::Light::Type::Point:
 		{
@@ -891,24 +890,32 @@ void unirender::cycles::Renderer::SyncLight(unirender::Scene &scene, const unire
 	case unirender::Light::Type::Spot:
 		{
 			auto &rot = light.GetRotation();
+			auto forward = uquat::forward(rot);
 			cclLight->set_spot_smooth(light.GetBlendFraction());
 			cclLight->set_spot_angle(umath::deg_to_rad(light.GetOuterConeAngle()));
 			break;
 		}
 	case unirender::Light::Type::Directional:
-		break;
+		{
+			auto &rot = light.GetRotation();
+			auto forward = uquat::forward(rot);
+			break;
+		}
 	case unirender::Light::Type::Area:
 		{
 			auto &axisU = light.GetAxisU();
 			auto &axisV = light.GetAxisV();
 			auto sizeU = light.GetSizeU();
 			auto sizeV = light.GetSizeV();
-
-			ccl::transform_set_column(&pose, 0, ToCyclesNormal(axisU));
-			ccl::transform_set_column(&pose, 1, ToCyclesNormal(axisV));
+			//cclLight->set_axisu(ToCyclesNormal(axisU));
+			//cclLight->set_axisv(ToCyclesNormal(axisV));
 			cclLight->set_sizeu(ToCyclesLength(sizeU));
 			cclLight->set_sizev(ToCyclesLength(sizeV));
 			cclLight->set_ellipse(light.IsRound());
+
+			auto &rot = light.GetRotation();
+			auto forward = uquat::forward(rot);
+			//cclLight->set_dir(ToCyclesNormal(forward));
 			break;
 		}
 	case unirender::Light::Type::Background:
@@ -944,7 +951,21 @@ void unirender::cycles::Renderer::SyncLight(unirender::Scene &scene, const unire
 	auto &color = light.GetColor();
 	cclLight->set_strength(ccl::float3 {color.r, color.g, color.b} * watt);
 	cclLight->set_size(ToCyclesLength(light.GetSize()));
-	cclLight->set_tfm(pose);
+
+	// Apply pose
+	{
+		auto pose = light.GetPose();
+		auto rot = pose.GetRotation();
+		auto mat = Mat3 {umat::create(rot)};
+		// Convert to CCL rotation
+		auto cclRot = ccl::make_transform(mat[0][0], mat[0][1], mat[0][2], 0.f, mat[2][0], mat[2][1], mat[2][2], 0.f, mat[1][0], mat[1][1], mat[1][2], 0.f);
+
+		auto cclT = ccl::transform_identity();
+		cclT = cclT * cclRot;
+		cclT = ccl::transform_translate(ToCyclesPosition(pose.GetOrigin())) * cclT;
+		cclT = cclT * ccl::transform_scale(ToCyclesVector(pose.GetScale()));
+		cclLight->set_tfm(cclT);
+	}
 
 	cclLight->set_max_bounces(1'024);
 	cclLight->set_map_resolution(2'048);
