@@ -931,14 +931,10 @@ void unirender::cycles::Renderer::SyncLight(unirender::Scene &scene, const unire
 		{
 			cclLight->set_spot_smooth(light.GetBlendFraction());
 			cclLight->set_spot_angle(umath::deg_to_rad(light.GetOuterConeAngle()));
-			cclLight->set_is_sphere(false);
 			break;
 		}
 	case unirender::Light::Type::Directional:
-		{
-			cclLight->set_is_sphere(false);
-			break;
-		}
+		break;
 	case unirender::Light::Type::Area:
 		{
 			auto &axisU = light.GetAxisU();
@@ -950,7 +946,6 @@ void unirender::cycles::Renderer::SyncLight(unirender::Scene &scene, const unire
 			cclLight->set_sizeu(ToCyclesLength(sizeU));
 			cclLight->set_sizev(ToCyclesLength(sizeV));
 			cclLight->set_ellipse(light.IsRound());
-			cclLight->set_is_sphere(false);
 
 			auto &rot = light.GetRotation();
 			auto forward = uquat::forward(rot);
@@ -966,6 +961,10 @@ void unirender::cycles::Renderer::SyncLight(unirender::Scene &scene, const unire
 			break;
 		}
 	}
+
+	// This was introduced in a cycles update and causes odd lighting artifacts (like circles on walls close to light sources)
+	// Unsure what this property is for or why it's enabled by default, but by disabling it we get the old behavior back.
+	cclLight->set_is_sphere(false);
 
 	auto lightType = (light.GetType() == unirender::Light::Type::Spot) ? util::pragma::LightType::Spot : (light.GetType() == unirender::Light::Type::Directional) ? util::pragma::LightType::Directional : util::pragma::LightType::Point;
 	auto watt = (lightType == util::pragma::LightType::Spot) ? ulighting::cycles::lumen_to_watt_spot(light.GetIntensity(), light.GetColor(), light.GetOuterConeAngle())
