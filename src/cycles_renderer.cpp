@@ -845,6 +845,46 @@ void unirender::cycles::Renderer::SyncCamera(const unirender::Camera &cam, bool 
 	*(*this)->dicing_camera = cclCam;
 }
 
+ccl::Transform transpose(const ccl::Transform &t)
+{
+	ccl::Transform result;
+
+	result.x.x = t.x.x;
+	result.x.y = t.y.x;
+	result.x.z = t.z.x;
+	result.x.w = 0.0f;
+
+	result.y.x = t.x.y;
+	result.y.y = t.y.y;
+	result.y.z = t.z.y;
+	result.y.w = 0.0f;
+
+	result.z.x = t.x.z;
+	result.z.y = t.y.z;
+	result.z.z = t.z.z;
+	result.z.w = 0.0f;
+
+	return result;
+}
+ccl::Transform ToCyclesTransform2(const umath::ScaledTransform &t, bool applyRotOffset)
+{
+	Vector3 axis;
+	float angle;
+	uquat::to_axis_angle(t.GetRotation(), axis, angle);
+	//axis = -axis;
+	auto cclT = ccl::transform_identity();
+	cclT = ccl::transform_rotate(angle, unirender::cycles::Renderer::ToCyclesNormal(axis));
+	if(applyRotOffset)
+		cclT = cclT * ccl::transform_rotate(umath::deg_to_rad(90.f), ccl::float3 {1.f, 0.f, 0.f});
+	auto dir = ccl::transform_get_column(&cclT, 2);
+	dir = -dir;
+	ccl::transform_set_column(&cclT, 2, dir);
+
+	cclT = ccl::transform_translate(unirender::cycles::Renderer::ToCyclesPosition(t.GetOrigin())) * cclT;
+	cclT = cclT * ccl::transform_scale(unirender::cycles::Renderer::ToCyclesVector(t.GetScale()));
+	return cclT;
+}
+
 void unirender::cycles::Renderer::SyncLight(unirender::Scene &scene, const unirender::Light &light, bool update)
 {
 	ccl::Light *cclLight = nullptr;
@@ -889,16 +929,14 @@ void unirender::cycles::Renderer::SyncLight(unirender::Scene &scene, const unire
 		}
 	case unirender::Light::Type::Spot:
 		{
-			auto &rot = light.GetRotation();
-			auto forward = uquat::forward(rot);
 			cclLight->set_spot_smooth(light.GetBlendFraction());
 			cclLight->set_spot_angle(umath::deg_to_rad(light.GetOuterConeAngle()));
+			cclLight->set_is_sphere(false);
 			break;
 		}
 	case unirender::Light::Type::Directional:
 		{
-			auto &rot = light.GetRotation();
-			auto forward = uquat::forward(rot);
+			cclLight->set_is_sphere(false);
 			break;
 		}
 	case unirender::Light::Type::Area:
@@ -912,6 +950,7 @@ void unirender::cycles::Renderer::SyncLight(unirender::Scene &scene, const unire
 			cclLight->set_sizeu(ToCyclesLength(sizeU));
 			cclLight->set_sizev(ToCyclesLength(sizeV));
 			cclLight->set_ellipse(light.IsRound());
+			cclLight->set_is_sphere(false);
 
 			auto &rot = light.GetRotation();
 			auto forward = uquat::forward(rot);
@@ -954,6 +993,7 @@ void unirender::cycles::Renderer::SyncLight(unirender::Scene &scene, const unire
 
 	// Apply pose
 	{
+#if 0
 		auto pose = light.GetPose();
 		auto rot = pose.GetRotation();
 		auto mat = Mat3 {umat::create(rot)};
@@ -965,6 +1005,10 @@ void unirender::cycles::Renderer::SyncLight(unirender::Scene &scene, const unire
 		cclT = ccl::transform_translate(ToCyclesPosition(pose.GetOrigin())) * cclT;
 		cclT = cclT * ccl::transform_scale(ToCyclesVector(pose.GetScale()));
 		cclLight->set_tfm(cclT);
+#endif
+
+		auto pose = light.GetPose();
+		cclLight->set_tfm(ToCyclesTransform2(pose, true));
 	}
 
 	cclLight->set_max_bounces(1'024);
