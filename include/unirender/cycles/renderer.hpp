@@ -46,7 +46,7 @@ namespace unirender::cycles {
 		static ccl::float3 ToCyclesPosition(const Vector3 &pos);
 		static ccl::float3 ToCyclesNormal(const Vector3 &n);
 		static ccl::float2 ToCyclesUV(const Vector2 &uv);
-		static ccl::Transform ToCyclesTransform(const umath::ScaledTransform &t, bool applyRotOffset = false);
+		static ccl::Transform ToCyclesTransform(const umath::ScaledTransform &t, bool applyRotOffset = false, bool inverseDirection = false);
 		static float ToCyclesLength(float len);
 
 		virtual ~Renderer() override;

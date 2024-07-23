@@ -175,7 +175,7 @@ ccl::float3 unirender::cycles::Renderer::ToCyclesNormal(const Vector3 &n)
 
 ccl::float2 unirender::cycles::Renderer::ToCyclesUV(const Vector2 &uv) { return ccl::float2 {uv.x, 1.f - uv.y}; }
 
-ccl::Transform unirender::cycles::Renderer::ToCyclesTransform(const umath::ScaledTransform &t, bool applyRotOffset)
+ccl::Transform unirender::cycles::Renderer::ToCyclesTransform(const umath::ScaledTransform &t, bool applyRotOffset, bool inverseDirection)
 {
 	Vector3 axis;
 	float angle;
@@ -184,6 +184,14 @@ ccl::Transform unirender::cycles::Renderer::ToCyclesTransform(const umath::Scale
 	cclT = cclT * ccl::transform_rotate(angle, ToCyclesNormal(axis));
 	if(applyRotOffset)
 		cclT = cclT * ccl::transform_rotate(umath::deg_to_rad(90.f), ccl::float3 {1.f, 0.f, 0.f});
+
+	if(inverseDirection) {
+		// For whatever reason the direction of light sources is inversed in cycles.
+		auto dir = ccl::transform_get_column(&cclT, 2);
+		dir = -dir;
+		ccl::transform_set_column(&cclT, 2, dir);
+	}
+
 	cclT = ccl::transform_translate(ToCyclesPosition(t.GetOrigin())) * cclT;
 	cclT = cclT * ccl::transform_scale(ToCyclesVector(t.GetScale()));
 	return cclT;
@@ -845,46 +853,6 @@ void unirender::cycles::Renderer::SyncCamera(const unirender::Camera &cam, bool 
 	*(*this)->dicing_camera = cclCam;
 }
 
-ccl::Transform transpose(const ccl::Transform &t)
-{
-	ccl::Transform result;
-
-	result.x.x = t.x.x;
-	result.x.y = t.y.x;
-	result.x.z = t.z.x;
-	result.x.w = 0.0f;
-
-	result.y.x = t.x.y;
-	result.y.y = t.y.y;
-	result.y.z = t.z.y;
-	result.y.w = 0.0f;
-
-	result.z.x = t.x.z;
-	result.z.y = t.y.z;
-	result.z.z = t.z.z;
-	result.z.w = 0.0f;
-
-	return result;
-}
-ccl::Transform ToCyclesTransform2(const umath::ScaledTransform &t, bool applyRotOffset)
-{
-	Vector3 axis;
-	float angle;
-	uquat::to_axis_angle(t.GetRotation(), axis, angle);
-	//axis = -axis;
-	auto cclT = ccl::transform_identity();
-	cclT = ccl::transform_rotate(angle, unirender::cycles::Renderer::ToCyclesNormal(axis));
-	if(applyRotOffset)
-		cclT = cclT * ccl::transform_rotate(umath::deg_to_rad(90.f), ccl::float3 {1.f, 0.f, 0.f});
-	auto dir = ccl::transform_get_column(&cclT, 2);
-	dir = -dir;
-	ccl::transform_set_column(&cclT, 2, dir);
-
-	cclT = ccl::transform_translate(unirender::cycles::Renderer::ToCyclesPosition(t.GetOrigin())) * cclT;
-	cclT = cclT * ccl::transform_scale(unirender::cycles::Renderer::ToCyclesVector(t.GetScale()));
-	return cclT;
-}
-
 void unirender::cycles::Renderer::SyncLight(unirender::Scene &scene, const unirender::Light &light, bool update)
 {
 	ccl::Light *cclLight = nullptr;
@@ -941,6 +909,9 @@ void unirender::cycles::Renderer::SyncLight(unirender::Scene &scene, const unire
 			auto &axisV = light.GetAxisV();
 			auto sizeU = light.GetSizeU();
 			auto sizeV = light.GetSizeV();
+			// TODO: These properties were removed in a cycles update and
+			// axisu and axisv are now handled through the tfm matrix.
+			// It's not quite clear how we should be setting these now.
 			//cclLight->set_axisu(ToCyclesNormal(axisU));
 			//cclLight->set_axisv(ToCyclesNormal(axisV));
 			cclLight->set_sizeu(ToCyclesLength(sizeU));
@@ -991,24 +962,8 @@ void unirender::cycles::Renderer::SyncLight(unirender::Scene &scene, const unire
 	cclLight->set_size(ToCyclesLength(light.GetSize()));
 
 	// Apply pose
-	{
-#if 0
-		auto pose = light.GetPose();
-		auto rot = pose.GetRotation();
-		auto mat = Mat3 {umat::create(rot)};
-		// Convert to CCL rotation
-		auto cclRot = ccl::make_transform(mat[0][0], mat[0][1], mat[0][2], 0.f, mat[2][0], mat[2][1], mat[2][2], 0.f, mat[1][0], mat[1][1], mat[1][2], 0.f);
-
-		auto cclT = ccl::transform_identity();
-		cclT = cclT * cclRot;
-		cclT = ccl::transform_translate(ToCyclesPosition(pose.GetOrigin())) * cclT;
-		cclT = cclT * ccl::transform_scale(ToCyclesVector(pose.GetScale()));
-		cclLight->set_tfm(cclT);
-#endif
-
-		auto pose = light.GetPose();
-		cclLight->set_tfm(ToCyclesTransform2(pose, true));
-	}
+	auto pose = light.GetPose();
+	cclLight->set_tfm(ToCyclesTransform(pose, true /* applyRotOffset */, true /* inverseDirection */));
 
 	cclLight->set_max_bounces(1'024);
 	cclLight->set_map_resolution(2'048);
