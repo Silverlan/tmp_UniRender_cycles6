@@ -46,8 +46,8 @@ jobs:
       - name: Copy UniRender_cycles files
         shell: bash
         run: |
-          mkdir -p "release/modules/unirender/cycles"
-          cp -r "${{ steps.build-deps.outputs.install-dir }}/modules/unirender/cycles" "release/modules/unirender/cycles"
+          mkdir -p "release/modules/unirender"
+          cp -r "${{ steps.build-deps.outputs.install-dir }}/modules/unirender/cycles" "release/modules/unirender"
         
       - name: Release Binaries
         uses: Silverlan/common_actions/release_nightly_binaries@main
