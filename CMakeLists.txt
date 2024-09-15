@@ -58,6 +58,8 @@ pr_add_compile_definitions(${PROJ_NAME}
 	-DWITH_OPENSUBDIV
 	-DWITH_OCIO
 	-DWITH_SYSTEM_PUGIXML
+	-DWITH_KERNEL_SSE42
+	-DWITH_KERNEL_AVX2
 	PUBLIC
 )
 pr_add_compile_definitions(${PROJ_NAME} -DCCL_NAMESPACE_BEGIN=namespace\ ccl\ { PUBLIC)
