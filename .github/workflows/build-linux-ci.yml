@@ -94,6 +94,16 @@ jobs:
           cp $depsDir/cycles/build/src/kernel/*.ptx "$cyclesDir/source/kernel/"
           cp $depsDir/cycles/build/src/kernel/*.cubin "$cyclesDir/source/kernel/"
 
+      - name: Copy render_raytracing files
+        shell: bash
+        run: |
+          mkdir -p "release/lib"
+          cp "${{ steps.build-deps.outputs.install-dir }}/lib/librender_raytracing_lib.so" "release/lib" || true
+          cp "${{ steps.build-deps.outputs.install-dir }}/lib/render_raytracing" "release/lib" || true
+          cp "${{ steps.build-deps.outputs.install-dir }}/lib/libutil_raytracing.so" "release/lib" || true
+          cp "${{ steps.build-deps.outputs.install-dir }}/lib/libOpenColorIO*" "release/lib" || true
+          cp "${{ steps.build-deps.outputs.install-dir }}/lib/libOpenImageDenoise*" "release/lib" || true
+
       - name: Release Binaries
         uses: Silverlan/common_actions/release_nightly_binaries@main
         with:

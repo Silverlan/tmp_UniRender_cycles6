@@ -48,6 +48,16 @@ jobs:
         run: |
           mkdir -p "release/modules/unirender"
           cp -r "${{ steps.build-deps.outputs.install-dir }}/modules/unirender/cycles" "release/modules/unirender"
+
+      - name: Copy render_raytracing files
+        shell: bash
+        run: |
+          mkdir -p "release/bin"
+          cp "${{ steps.build-deps.outputs.install-dir }}/bin/render_raytracing_lib.dll" "release/bin" || true
+          cp "${{ steps.build-deps.outputs.install-dir }}/bin/render_raytracing.exe" "release/bin" || true
+          cp "${{ steps.build-deps.outputs.install-dir }}/bin/util_raytracing.dll" "release/bin" || true
+          cp "${{ steps.build-deps.outputs.install-dir }}/bin/OpenColorIO*" "release/bin" || true
+          cp "${{ steps.build-deps.outputs.install-dir }}/bin/OpenImageDenoise*" "release/bin" || true
         
       - name: Release Binaries
         uses: Silverlan/common_actions/release_nightly_binaries@main
