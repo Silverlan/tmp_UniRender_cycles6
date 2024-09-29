@@ -716,6 +716,8 @@ static bool apply_translated_socket_value(const ccl::ShaderNode &shaderNode, con
 
 void unirender::CCLShader::ApplySocketValue(const ccl::ShaderNode &shaderNode, const std::string &socketName, const NodeSocketDesc &sockDesc, ccl::Node &node, const ccl::SocketType &sockType)
 {
+	if(sockDesc.dataValue.type == SocketType::Closure)
+		return;
 	if(apply_translated_socket_value<ccl::MathNode, unirender::nodes::math::MathType>(shaderNode, socketName, "math_type", sockDesc, node, sockType))
 		return;
 	if(apply_translated_socket_value<ccl::MappingNode, unirender::nodes::mapping::Type>(shaderNode, socketName, "mapping_type", sockDesc, node, sockType))
