@@ -232,7 +232,9 @@ ccl::SessionParams unirender::cycles::Renderer::GetSessionParameters(const unire
 	ccl::SessionParams sessionParams {};
 	sessionParams.shadingsystem = ccl::SHADINGSYSTEM_SVM;
 	sessionParams.device = devInfo;
+#ifndef CYCLES_ROLLBACK_411
 	sessionParams.denoise_device = devInfo;
+#endif
 	sessionParams.background = true;
 	sessionParams.use_auto_tile = false; // Tile rendering is no longer relevant for Cycles X (and causes the output driver to not function properly)
 

@@ -5,6 +5,8 @@ set(UNIRENDER_CYCLES_ENABLE_DEPENDENCIES 1 CACHE BOOL "Enable project dependenci
 set(DEPENDENCY_CYCLES_LIBRARY_LOCATION "" CACHE FILEPATH "Path to cycles libraries.")
 set(DEPENDENCY_CYCLES_DEPENDENCIES_LOCATION "" CACHE FILEPATH "Path to cycles dependencies.")
 
+option(ROLLBACK_CYCLES_4_1_1 "Enable Rollback to Cycles 4.1.1" OFF)
+
 set(PROJ_NAME UniRender_cycles)
 pr_add_library(${PROJ_NAME} SHARED)
 
@@ -64,6 +66,9 @@ pr_add_compile_definitions(${PROJ_NAME}
 )
 pr_add_compile_definitions(${PROJ_NAME} -DCCL_NAMESPACE_BEGIN=namespace\ ccl\ { PUBLIC)
 pr_add_compile_definitions(${PROJ_NAME} -DCCL_NAMESPACE_END=} PUBLIC)
+if(ROLLBACK_CYCLES_4_1_1)
+	pr_add_compile_definitions(${PROJ_NAME} -DCYCLES_ROLLBACK_411)
+endif()
 
 if(WIN32)
 	pr_add_compile_definitions(${PROJ_NAME} -DWITH_CYCLES_LOGGING)
