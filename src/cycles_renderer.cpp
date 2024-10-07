@@ -146,7 +146,7 @@ ccl::float3 unirender::cycles::Renderer::ToCyclesVector(const Vector3 &v) { retu
 
 Vector3 unirender::cycles::Renderer::ToPragmaPosition(const ccl::float3 &pos)
 {
-	auto scale = util::pragma::units_to_metres(1.f);
+	auto scale = pragma::units_to_metres(1.f);
 	Vector3 prPos {pos.x, pos.z, -pos.y};
 	prPos /= scale;
 	return prPos;
@@ -154,7 +154,7 @@ Vector3 unirender::cycles::Renderer::ToPragmaPosition(const ccl::float3 &pos)
 
 ccl::float3 unirender::cycles::Renderer::ToCyclesPosition(const Vector3 &pos)
 {
-	auto scale = util::pragma::units_to_metres(1.f);
+	auto scale = pragma::units_to_metres(1.f);
 #ifdef ENABLE_TEST_AMBIENT_OCCLUSION
 	ccl::float3 cpos {pos.x, -pos.z, pos.y};
 #else
@@ -199,7 +199,7 @@ ccl::Transform unirender::cycles::Renderer::ToCyclesTransform(const umath::Scale
 
 float unirender::cycles::Renderer::ToCyclesLength(float len)
 {
-	auto scale = util::pragma::units_to_metres(1.f);
+	auto scale = pragma::units_to_metres(1.f);
 	return len * scale;
 }
 std::shared_ptr<unirender::cycles::Renderer> unirender::cycles::Renderer::Create(const unirender::Scene &scene, std::string &outErr, Flags flags)
@@ -940,9 +940,9 @@ void unirender::cycles::Renderer::SyncLight(unirender::Scene &scene, const unire
 	// Unsure what this property is for or why it's enabled by default, but by disabling it we get the old behavior back.
 	cclLight->set_is_sphere(false);
 
-	auto lightType = (light.GetType() == unirender::Light::Type::Spot) ? util::pragma::LightType::Spot : (light.GetType() == unirender::Light::Type::Directional) ? util::pragma::LightType::Directional : util::pragma::LightType::Point;
-	auto watt = (lightType == util::pragma::LightType::Spot) ? ulighting::cycles::lumen_to_watt_spot(light.GetIntensity(), light.GetColor(), light.GetOuterConeAngle())
-	  : (lightType == util::pragma::LightType::Point)        ? ulighting::cycles::lumen_to_watt_point(light.GetIntensity(), light.GetColor())
+	auto lightType = (light.GetType() == unirender::Light::Type::Spot) ? pragma::LightType::Spot : (light.GetType() == unirender::Light::Type::Directional) ? pragma::LightType::Directional : pragma::LightType::Point;
+	auto watt = (lightType == pragma::LightType::Spot) ? ulighting::cycles::lumen_to_watt_spot(light.GetIntensity(), light.GetColor(), light.GetOuterConeAngle())
+	  : (lightType == pragma::LightType::Point)        ? ulighting::cycles::lumen_to_watt_point(light.GetIntensity(), light.GetColor())
 	                                                         : ulighting::cycles::lumen_to_watt_area(light.GetIntensity(), light.GetColor());
 
 	// Multiple importance sampling. It's disabled by default for some reason, but it's usually best to keep it on.
