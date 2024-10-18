@@ -5,10 +5,10 @@
 * Copyright (c) 2021 Silverlan
 */
 
-#include "unirender/cycles/display_driver.hpp"
-#include <util_raytracing/tilemanager.hpp>
-#include <util_raytracing/denoise.hpp>
-#include <util_raytracing/renderer.hpp>
+module;
+
+#include <util_image.hpp>
+#include <util_image_buffer.hpp>
 #include <util_image.hpp>
 #include <mathutil/color.h>
 #include <sharedutils/util_string.h>
@@ -17,7 +17,12 @@
 #include <sharedutils/magic_enum.hpp>
 #include <fsys/filesystem.h>
 #include <fsys/ifile.hpp>
-#include <util_image_buffer.hpp>
+#include <mutex>
+
+module pragma.scenekit.cycles;
+
+import pragma.scenekit;
+
 #pragma optimize("", off)
 static void dump_image_file(const std::string &name, uimg::ImageBuffer &imgBuf)
 {
@@ -28,11 +33,11 @@ static void dump_image_file(const std::string &name, uimg::ImageBuffer &imgBuf)
 	}
 }
 
-unirender::cycles::BaseDriver::BaseDriver(uint32_t width, uint32_t height) : m_width {width}, m_height {height} {}
+pragma::scenekit::cycles::BaseDriver::BaseDriver(uint32_t width, uint32_t height) : m_width {width}, m_height {height} {}
 
 ////////////
 
-unirender::cycles::DisplayDriver::DisplayDriver(unirender::TileManager &tileManager, uint32_t width, uint32_t height) : BaseDriver {width, height}, m_tileManager {tileManager}
+pragma::scenekit::cycles::DisplayDriver::DisplayDriver(pragma::scenekit::TileManager &tileManager, uint32_t width, uint32_t height) : BaseDriver {width, height}, m_tileManager {tileManager}
 {
 	m_postProcessingThread = std::thread {[this]() {
 		while(m_ppThreadRunning)
@@ -41,13 +46,13 @@ unirender::cycles::DisplayDriver::DisplayDriver(unirender::TileManager &tileMana
 
 	util::set_thread_name(m_postProcessingThread, "cycles_display_driver_pp");
 }
-unirender::cycles::DisplayDriver::~DisplayDriver()
+pragma::scenekit::cycles::DisplayDriver::~DisplayDriver()
 {
 	m_ppThreadRunning = false;
 	m_postProcessingCondition.notify_one();
 	m_postProcessingThread.join();
 }
-void unirender::cycles::DisplayDriver::UpdateTileResolution(uint32_t tileWidth, uint32_t tileHeight)
+void pragma::scenekit::cycles::DisplayDriver::UpdateTileResolution(uint32_t tileWidth, uint32_t tileHeight)
 {
 	if(tileWidth == m_tileWidth && tileHeight == m_tileHeight)
 		return;
@@ -69,12 +74,12 @@ void unirender::cycles::DisplayDriver::UpdateTileResolution(uint32_t tileWidth, 
 		m_pendingForPpTileImageBuffers.push_back(uimg::ImageBuffer::Create(tileWidth, tileHeight, uimg::Format::RGBA16));
 	}
 }
-uint32_t unirender::cycles::DisplayDriver::GetTileIndex(uint32_t x, uint32_t y) const
+uint32_t pragma::scenekit::cycles::DisplayDriver::GetTileIndex(uint32_t x, uint32_t y) const
 {
 	auto numTilesX = m_numTilesX;
 	return (y / m_tileHeight) * numTilesX + (x / m_tileWidth);
 }
-bool unirender::cycles::DisplayDriver::update_begin(const Params &params, int effectiveWidth, int effectiveHeight)
+bool pragma::scenekit::cycles::DisplayDriver::update_begin(const Params &params, int effectiveWidth, int effectiveHeight)
 {
 	auto inBounds = (params.full_offset.x >= 0 && params.full_offset.y >= 0 && params.full_offset.x + effectiveWidth <= m_width && params.full_offset.y + effectiveHeight <= m_height);
 	assert(inBounds);
@@ -85,13 +90,13 @@ bool unirender::cycles::DisplayDriver::update_begin(const Params &params, int ef
 	m_mappedTileIndex = GetTileIndex(params.full_offset.x, params.full_offset.y);
 	return true;
 }
-void unirender::cycles::DisplayDriver::update_end()
+void pragma::scenekit::cycles::DisplayDriver::update_end()
 {
 	m_mappedSize = {0, 0};
 	m_mappedOffset = {0, 0};
 	m_mappedTileIndex = 0;
 }
-void unirender::cycles::DisplayDriver::RunPostProcessing()
+void pragma::scenekit::cycles::DisplayDriver::RunPostProcessing()
 {
 	struct TileData {
 		TileInfo info;
@@ -127,7 +132,7 @@ void unirender::cycles::DisplayDriver::RunPostProcessing()
 		inputTile.h = tileInfo.effectiveSize.y;
 		inputTile.index = tileInfo.tileIndex;
 		inputTile.sample = 1; // Not accurate, but doesn't matter here
-		inputTile.flags |= unirender::TileManager::TileData::Flags::HDRData;
+		inputTile.flags |= pragma::scenekit::TileManager::TileData::Flags::HDRData;
 		inputTile.data = std::move(tileData.data);
 
 		auto &imgBuf = m_tmpImageBuffers[tileInfo.tileIndex];
@@ -141,10 +146,10 @@ void unirender::cycles::DisplayDriver::RunPostProcessing()
 			denoiseInfo.hdr = true;
 			denoiseInfo.width = inputTile.w;
 			denoiseInfo.height = inputTile.h;
-			unirender::denoise::ImageData output {};
+			pragma::scenekit::denoise::ImageData output {};
 			output.data = inputTile.data.data();
 			output.format = imgBuf->GetFormat();
-			unirender::denoise::ImageInputs inputs {};
+			pragma::scenekit::denoise::ImageInputs inputs {};
 			inputs.beautyImage = output;
 			denoise::denoise(denoiseInfo, inputs, output);
 		}
@@ -158,12 +163,12 @@ void unirender::cycles::DisplayDriver::RunPostProcessing()
 
 	m_tileWritten = true;
 }
-ccl::half4 *unirender::cycles::DisplayDriver::map_texture_buffer()
+ccl::half4 *pragma::scenekit::cycles::DisplayDriver::map_texture_buffer()
 {
 	static_assert(sizeof(ccl::half4) == sizeof(uint16_t) * 4);
 	return static_cast<ccl::half4 *>(m_mappedTileImageBuffers[m_mappedTileIndex]->GetData());
 }
-void unirender::cycles::DisplayDriver::unmap_texture_buffer()
+void pragma::scenekit::cycles::DisplayDriver::unmap_texture_buffer()
 {
 	// We want to keep the overhead here to a bare minimum, in order to avoid
 	// stalling the Cycles renderer.
@@ -185,7 +190,7 @@ void unirender::cycles::DisplayDriver::unmap_texture_buffer()
 	m_imageBufferReadyForPp.push({tileIndex, m_mappedOffset, m_mappedSize});
 	m_postProcessingCondition.notify_one();
 }
-void unirender::cycles::DisplayDriver::clear()
+void pragma::scenekit::cycles::DisplayDriver::clear()
 {
 	// TODO: m_pendingForPpImageBuffer should be cleared as well?
 	for(auto &imgBuf : m_mappedTileImageBuffers) {
@@ -193,17 +198,17 @@ void unirender::cycles::DisplayDriver::clear()
 		memset(data, 0, imgBuf->GetSize());
 	}
 }
-void unirender::cycles::DisplayDriver::next_tile_begin() {}
-void unirender::cycles::DisplayDriver::draw(const Params &params) {}
+void pragma::scenekit::cycles::DisplayDriver::next_tile_begin() {}
+void pragma::scenekit::cycles::DisplayDriver::draw(const Params &params) {}
 
 ////////////
 
-unirender::cycles::OutputDriver::OutputDriver(const std::vector<std::pair<PassType, uimg::Format>> &passes, uint32_t width, uint32_t height) : BaseDriver {width, height}, m_passes {passes}
+pragma::scenekit::cycles::OutputDriver::OutputDriver(const std::vector<std::pair<PassType, uimg::Format>> &passes, uint32_t width, uint32_t height) : BaseDriver {width, height}, m_passes {passes}
 {
 	m_tileData.resize(width * height);
 	Reset();
 }
-void unirender::cycles::OutputDriver::Reset()
+void pragma::scenekit::cycles::OutputDriver::Reset()
 {
 	m_imageBuffers.clear();
 	m_imageBuffers.reserve(m_passes.size());
@@ -212,18 +217,18 @@ void unirender::cycles::OutputDriver::Reset()
 		m_imageBuffers[pair.first] = PassInfo {std::string {magic_enum::enum_name(pair.first)}, imgBuf};
 	}
 }
-void unirender::cycles::OutputDriver::DebugDumpImages()
+void pragma::scenekit::cycles::OutputDriver::DebugDumpImages()
 {
 	for(auto &pair : m_imageBuffers)
 		dump_image_file(std::string {magic_enum::enum_name(pair.first)}, *pair.second.imageBuffer);
 }
-std::shared_ptr<uimg::ImageBuffer> unirender::cycles::OutputDriver::GetImageBuffer(PassType pass) const
+std::shared_ptr<uimg::ImageBuffer> pragma::scenekit::cycles::OutputDriver::GetImageBuffer(PassType pass) const
 {
 	auto it = m_imageBuffers.find(pass);
 	return (it != m_imageBuffers.end()) ? it->second.imageBuffer : nullptr;
 }
-const std::unordered_map<unirender::PassType, unirender::cycles::OutputDriver::PassInfo> &unirender::cycles::OutputDriver::GetImageBuffers() const { return m_imageBuffers; }
-void unirender::cycles::OutputDriver::write_render_tile(const Tile &tile)
+const std::unordered_map<pragma::scenekit::PassType, pragma::scenekit::cycles::OutputDriver::PassInfo> &pragma::scenekit::cycles::OutputDriver::GetImageBuffers() const { return m_imageBuffers; }
+void pragma::scenekit::cycles::OutputDriver::write_render_tile(const Tile &tile)
 {
 	for(auto &pair : m_imageBuffers) {
 		auto &info = pair.second;
@@ -241,7 +246,7 @@ void unirender::cycles::OutputDriver::write_render_tile(const Tile &tile)
 	}
 }
 
-bool unirender::cycles::OutputDriver::update_render_tile(const Tile &tile)
+bool pragma::scenekit::cycles::OutputDriver::update_render_tile(const Tile &tile)
 {
 	//write_render_tile(tile);
 	return false;
@@ -256,8 +261,8 @@ static float intToFloat(int32_t i)
 	u.i = i;
 	return u.f;
 }
-void unirender::cycles::OutputDriver::SetBakeData(const util::baking::BakeDataView &bakeData) { m_bakeData = &bakeData; }
-bool unirender::cycles::OutputDriver::read_render_tile(const Tile &tile)
+void pragma::scenekit::cycles::OutputDriver::SetBakeData(const util::baking::BakeDataView &bakeData) { m_bakeData = &bakeData; }
+bool pragma::scenekit::cycles::OutputDriver::read_render_tile(const Tile &tile)
 {
 	if(!m_bakeData)
 		return false;

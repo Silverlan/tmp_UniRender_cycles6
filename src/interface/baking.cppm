@@ -14,8 +14,7 @@
 * limitations under the License.
 */
 
-#ifndef __PR_CYCLES_UTIL_BAKING_HPP__
-#define __PR_CYCLES_UTIL_BAKING_HPP__
+module;
 
 #include "scene/bake.h"
 #include <util_image_buffer.hpp>
@@ -26,7 +25,9 @@ namespace util::baking {
 	struct BakePixel;
 };
 
-namespace unirender {
+export module pragma.scenekit.cycles:baking;
+
+export namespace pragma::scenekit {
 	class Object;
 	class Scene;
 	namespace cycles {
@@ -36,5 +37,3 @@ namespace unirender {
 		void prepare_bake_data(const cycles::Renderer &renderer, Object &o, util::baking::BakePixel *pixelArray, uint32_t numPixels, uint32_t imgWidth, uint32_t imgHeight, bool useLightmapUvs = false);
 	};
 }
-
-#endif

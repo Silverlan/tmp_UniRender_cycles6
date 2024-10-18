@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+module;
+
 #ifdef _WIN32
 #include <stdio.h>
 
@@ -47,6 +49,8 @@
 #include "util/xml.h"
 
 #include "app/cycles_xml.h"
+
+module pragma.scenekit.cycles;
 
 using namespace pugi;
 

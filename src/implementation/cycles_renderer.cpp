@@ -5,29 +5,11 @@
 * Copyright (c) 2021 Silverlan
 */
 
-#include "util_raytracing/scene.hpp"
-#include "util_raytracing/mesh.hpp"
-#include "util_raytracing/object.hpp"
-#include "util_raytracing/scene.hpp"
-#include "util_raytracing/light.hpp"
-#include "util_raytracing/camera.hpp"
-#include "unirender/cycles/baking.hpp"
-#include "unirender/cycles/renderer.hpp"
-#include "unirender/cycles/display_driver.hpp"
-#include "util_raytracing/shader_nodes.hpp"
-#include "unirender/cycles/ccl_shader.hpp"
-#include "util_raytracing/model_cache.hpp"
-#include "util_raytracing/color_management.hpp"
-#include "util_raytracing/denoise.hpp"
+module;
+
 #include <spdlog/logger.h>
-#include <sharedutils/util_hair.hpp>
-#include <sharedutils/util_baking.hpp>
-#include <fsys/ifile.hpp>
-#include <util_ocio.hpp>
 #include <scene/light.h>
 #include <scene/camera.h>
-#include <mathutil/umath_lighting.hpp>
-#include <mathutil/units.h>
 #include <session/buffers.h>
 #include <scene/scene.h>
 #include <session/session.h>
@@ -42,7 +24,16 @@
 #include <scene/bake.h>
 #include <scene/particles.h>
 #include <scene/hair.h>
+#include <app/oiio_output_driver.h>
+#include <sharedutils/util_baking.hpp>
+#include <sharedutils/util_pragma.hpp>
+#include <sharedutils/util_parallel_job.hpp>
+#include <fsys/ifile.hpp>
+#include <util_ocio.hpp>
+#include <mathutil/umath_lighting.hpp>
+#include <mathutil/units.h>
 #include <util/path.h>
+#include <udm.hpp>
 #ifdef _WIN32
 #define ENABLE_CYCLES_LOGGING
 #endif
@@ -56,8 +47,12 @@
 #include <Shlobj.h>
 #endif
 
+module pragma.scenekit.cycles;
+
+import pragma.scenekit;
+
 static std::optional<std::string> KERNEL_PATH {};
-void unirender::Scene::SetKernelPath(const std::string &kernelPath) { KERNEL_PATH = kernelPath; }
+void pragma::scenekit::Scene::SetKernelPath(const std::string &kernelPath) { KERNEL_PATH = kernelPath; }
 int cycles_standalone_test(int argc, const char **argv, bool initPaths);
 static void init_cycles()
 {
@@ -103,7 +98,7 @@ static void init_cycles()
 #endif
 
 	if(optixPath.has_value()) {
-		auto &logger = unirender::get_logger();
+		auto &logger = pragma::scenekit::get_logger();
 		if(logger)
 			logger->info("Found Optix SDK: {}", *optixPath);
 		util::set_env_variable("OPTIX_ROOT_DIR", *optixPath);
@@ -112,7 +107,7 @@ static void init_cycles()
 		putenv(("OPTIX_ROOT_DIR=" + *optixPath).data());
 	}
 	else {
-		auto &logger = unirender::get_logger();
+		auto &logger = pragma::scenekit::get_logger();
 		if(logger)
 			logger->info("Could not find Optix SDK! Dynamic Optix kernel building will be disabled!");
 	}
@@ -142,9 +137,9 @@ static bool is_device_type_available(ccl::DeviceType type)
 	return ccl::Device::available_devices(DEVICE_MASK(type)).empty() == false;
 }
 
-ccl::float3 unirender::cycles::Renderer::ToCyclesVector(const Vector3 &v) { return ccl::float3 {v.x, v.z, v.y}; }
+ccl::float3 pragma::scenekit::cycles::Renderer::ToCyclesVector(const Vector3 &v) { return ccl::float3 {v.x, v.z, v.y}; }
 
-Vector3 unirender::cycles::Renderer::ToPragmaPosition(const ccl::float3 &pos)
+Vector3 pragma::scenekit::cycles::Renderer::ToPragmaPosition(const ccl::float3 &pos)
 {
 	auto scale = pragma::units_to_metres(1.f);
 	Vector3 prPos {pos.x, pos.z, -pos.y};
@@ -152,7 +147,7 @@ Vector3 unirender::cycles::Renderer::ToPragmaPosition(const ccl::float3 &pos)
 	return prPos;
 }
 
-ccl::float3 unirender::cycles::Renderer::ToCyclesPosition(const Vector3 &pos)
+ccl::float3 pragma::scenekit::cycles::Renderer::ToCyclesPosition(const Vector3 &pos)
 {
 	auto scale = pragma::units_to_metres(1.f);
 #ifdef ENABLE_TEST_AMBIENT_OCCLUSION
@@ -164,7 +159,7 @@ ccl::float3 unirender::cycles::Renderer::ToCyclesPosition(const Vector3 &pos)
 	return cpos;
 }
 
-ccl::float3 unirender::cycles::Renderer::ToCyclesNormal(const Vector3 &n)
+ccl::float3 pragma::scenekit::cycles::Renderer::ToCyclesNormal(const Vector3 &n)
 {
 #ifdef ENABLE_TEST_AMBIENT_OCCLUSION
 	return ccl::float3 {n.x, -n.z, n.y};
@@ -173,9 +168,9 @@ ccl::float3 unirender::cycles::Renderer::ToCyclesNormal(const Vector3 &n)
 #endif
 }
 
-ccl::float2 unirender::cycles::Renderer::ToCyclesUV(const Vector2 &uv) { return ccl::float2 {uv.x, 1.f - uv.y}; }
+ccl::float2 pragma::scenekit::cycles::Renderer::ToCyclesUV(const Vector2 &uv) { return ccl::float2 {uv.x, 1.f - uv.y}; }
 
-ccl::Transform unirender::cycles::Renderer::ToCyclesTransform(const umath::ScaledTransform &t, bool applyRotOffset, bool inverseDirection)
+ccl::Transform pragma::scenekit::cycles::Renderer::ToCyclesTransform(const umath::ScaledTransform &t, bool applyRotOffset, bool inverseDirection)
 {
 	Vector3 axis;
 	float angle;
@@ -197,12 +192,12 @@ ccl::Transform unirender::cycles::Renderer::ToCyclesTransform(const umath::Scale
 	return cclT;
 }
 
-float unirender::cycles::Renderer::ToCyclesLength(float len)
+float pragma::scenekit::cycles::Renderer::ToCyclesLength(float len)
 {
 	auto scale = pragma::units_to_metres(1.f);
 	return len * scale;
 }
-std::shared_ptr<unirender::cycles::Renderer> unirender::cycles::Renderer::Create(const unirender::Scene &scene, std::string &outErr, Flags flags)
+std::shared_ptr<pragma::scenekit::cycles::Renderer> pragma::scenekit::cycles::Renderer::Create(const pragma::scenekit::Scene &scene, std::string &outErr, Flags flags)
 {
 	auto renderer = std::shared_ptr<Renderer> {new Renderer {scene, flags}};
 	renderer->m_renderMode = scene.GetRenderMode();
@@ -214,8 +209,8 @@ std::shared_ptr<unirender::cycles::Renderer> unirender::cycles::Renderer::Create
 	return renderer;
 }
 
-unirender::cycles::Renderer::Renderer(const Scene &scene, Flags flags) : unirender::Renderer {scene, flags} {}
-unirender::cycles::Renderer::~Renderer()
+pragma::scenekit::cycles::Renderer::Renderer(const Scene &scene, Flags flags) : pragma::scenekit::Renderer {scene, flags} {}
+pragma::scenekit::cycles::Renderer::~Renderer()
 {
 	FinalizeAndCloseCyclesScene();
 #ifdef ENABLE_CYCLES_LOGGING
@@ -226,7 +221,7 @@ unirender::cycles::Renderer::~Renderer()
 #endif
 }
 
-ccl::SessionParams unirender::cycles::Renderer::GetSessionParameters(const unirender::Scene &scene, const ccl::DeviceInfo &devInfo) const
+ccl::SessionParams pragma::scenekit::cycles::Renderer::GetSessionParameters(const pragma::scenekit::Scene &scene, const ccl::DeviceInfo &devInfo) const
 {
 	auto &createInfo = scene.GetCreateInfo();
 	ccl::SessionParams sessionParams {};
@@ -239,7 +234,7 @@ ccl::SessionParams unirender::cycles::Renderer::GetSessionParameters(const unire
 	sessionParams.use_auto_tile = false; // Tile rendering is no longer relevant for Cycles X (and causes the output driver to not function properly)
 
 	switch(m_deviceType) {
-	case unirender::Scene::DeviceType::GPU:
+	case pragma::scenekit::Scene::DeviceType::GPU:
 		sessionParams.tile_size = 256;
 		break;
 	default:
@@ -251,10 +246,10 @@ ccl::SessionParams unirender::cycles::Renderer::GetSessionParameters(const unire
 		sessionParams.samples = *createInfo.samples;
 	else {
 		switch(m_renderMode) {
-		case unirender::Scene::RenderMode::BakeAmbientOcclusion:
-		case unirender::Scene::RenderMode::BakeNormals:
-		case unirender::Scene::RenderMode::BakeDiffuseLighting:
-		case unirender::Scene::RenderMode::BakeDiffuseLightingSeparate:
+		case pragma::scenekit::Scene::RenderMode::BakeAmbientOcclusion:
+		case pragma::scenekit::Scene::RenderMode::BakeNormals:
+		case pragma::scenekit::Scene::RenderMode::BakeDiffuseLighting:
+		case pragma::scenekit::Scene::RenderMode::BakeDiffuseLightingSeparate:
 			sessionParams.samples = 1'225u;
 			break;
 		default:
@@ -267,7 +262,7 @@ ccl::SessionParams unirender::cycles::Renderer::GetSessionParameters(const unire
 		sessionParams.samples = 50'000;
 
 #ifdef ENABLE_TEST_AMBIENT_OCCLUSION
-	if(unirender::Scene::IsRenderSceneMode(m_renderMode) == false) {
+	if(pragma::scenekit::Scene::IsRenderSceneMode(m_renderMode) == false) {
 		//sessionParams.background = true;
 		/*sessionParams.progressive_refine = false;
 		sessionParams.progressive = false;
@@ -292,7 +287,7 @@ ccl::SessionParams unirender::cycles::Renderer::GetSessionParameters(const unire
 
 // Hip is not yet fully implemented in Cycles X, so it's currently disabled (state: 22-02-03)
 // #define ENABLE_AMD_HIP
-std::optional<ccl::DeviceInfo> unirender::cycles::Renderer::InitializeDevice(const unirender::Scene &scene, std::string &outErr)
+std::optional<ccl::DeviceInfo> pragma::scenekit::cycles::Renderer::InitializeDevice(const pragma::scenekit::Scene &scene, std::string &outErr)
 {
 	init_cycles();
 
@@ -334,7 +329,7 @@ std::optional<ccl::DeviceInfo> unirender::cycles::Renderer::InitializeDevice(con
 		auto enableOptix = true;
 		apiData.GetFromPath("cycles/enableOptix")(enableOptix); // Optix doesn't work properly on some devices, so we need an option to disable it
 		switch(createInfo.deviceType) {
-		case unirender::Scene::DeviceType::GPU:
+		case pragma::scenekit::Scene::DeviceType::GPU:
 			{
 				for(auto devType : gpuDeviceTypes) {
 					if(is_device_type_available(devType) && (devType != ccl::DeviceType::DEVICE_OPTIX || enableOptix)) {
@@ -344,11 +339,11 @@ std::optional<ccl::DeviceInfo> unirender::cycles::Renderer::InitializeDevice(con
 				}
 				// No break is intended!
 			}
-		case unirender::Scene::DeviceType::CPU:
+		case pragma::scenekit::Scene::DeviceType::CPU:
 			cclDeviceType = ccl::DeviceType::DEVICE_CPU;
 			break;
 		}
-		static_assert(umath::to_integral(unirender::Scene::DeviceType::Count) == 2);
+		static_assert(umath::to_integral(pragma::scenekit::Scene::DeviceType::Count) == 2);
 
 	endLoop:;
 	}
@@ -367,18 +362,18 @@ std::optional<ccl::DeviceInfo> unirender::cycles::Renderer::InitializeDevice(con
 		return {}; // No device available
 	}
 
-	auto &logger = unirender::get_logger();
+	auto &logger = pragma::scenekit::get_logger();
 	if(logger)
 		logger->info("Using device '{}'", ccl::Device::string_from_type(device->type));
 
 	auto deviceType = createInfo.deviceType;
 	if(device->type == ccl::DeviceType::DEVICE_CPU)
-		deviceType = unirender::Scene::DeviceType::CPU;
+		deviceType = pragma::scenekit::Scene::DeviceType::CPU;
 	m_deviceType = deviceType;
 	return device;
 }
 
-void unirender::cycles::Renderer::InitializeSession(unirender::Scene &scene, const ccl::DeviceInfo &devInfo)
+void pragma::scenekit::cycles::Renderer::InitializeSession(pragma::scenekit::Scene &scene, const ccl::DeviceInfo &devInfo)
 {
 	ccl::SceneParams sceneParams {};
 	sceneParams.shadingsystem = ccl::SHADINGSYSTEM_SVM;
@@ -417,17 +412,17 @@ void unirender::cycles::Renderer::InitializeSession(unirender::Scene &scene, con
 	}*/
 }
 
-ccl::Object *unirender::cycles::Renderer::FindCclObject(const Object &obj)
+ccl::Object *pragma::scenekit::cycles::Renderer::FindCclObject(const Object &obj)
 {
 	auto it = m_objectToCclObject.find(&const_cast<Object &>(obj));
 	return (it != m_objectToCclObject.end()) ? it->second.object : nullptr;
 }
-ccl::Mesh *unirender::cycles::Renderer::FindCclMesh(const Mesh &mesh)
+ccl::Mesh *pragma::scenekit::cycles::Renderer::FindCclMesh(const Mesh &mesh)
 {
 	auto it = m_meshToCcclMesh.find(&const_cast<Mesh &>(mesh));
 	return (it != m_meshToCcclMesh.end()) ? it->second : nullptr;
 }
-ccl::Light *unirender::cycles::Renderer::FindCclLight(const Light &light)
+ccl::Light *pragma::scenekit::cycles::Renderer::FindCclLight(const Light &light)
 {
 	auto it = m_lightToCclLight.find(&const_cast<Light &>(light));
 	return (it != m_lightToCclLight.end()) ? it->second : nullptr;
@@ -472,7 +467,7 @@ static void initialize_attribute(ccl::Geometry &mesh, ccl::AttributeStandard att
 	copy_vector_to_attribute(data, *attr, translate);
 }
 
-void unirender::cycles::Renderer::SyncObject(const unirender::Object &obj)
+void pragma::scenekit::cycles::Renderer::SyncObject(const pragma::scenekit::Object &obj)
 {
 	auto *cclObj = new ccl::Object {};
 	cclObj->name = obj.GetName();
@@ -559,7 +554,7 @@ static ccl::ShaderOutput *find_output_socket(ccl::ShaderNode &node, const char *
 	}
 	return nullptr;
 }
-void unirender::cycles::Renderer::SyncMesh(const unirender::Mesh &mesh)
+void pragma::scenekit::cycles::Renderer::SyncMesh(const pragma::scenekit::Mesh &mesh)
 {
 	auto *cclMesh = new ccl::Mesh {};
 	m_cclScene->geometry.push_back(cclMesh);
@@ -596,11 +591,11 @@ void unirender::cycles::Renderer::SyncMesh(const unirender::Mesh &mesh)
 
 	auto *attrT = cclMesh->attributes.add(ccl::ATTR_STD_UV_TANGENT);
 	if(attrT)
-		attrT->name = "orco" + Mesh::TANGENT_POSTFIX;
+		attrT->name = std::string {"orco"} + std::string {TANGENT_POSTFIX};
 
 	auto *attrTS = cclMesh->attributes.add(ccl::ATTR_STD_UV_TANGENT_SIGN);
 	if(attrTS)
-		attrTS->name = "orco" + Mesh::TANGENT_SIGN_POSTIFX;
+		attrTS->name = std::string {"orco"} + std::string {TANGENT_SIGN_POSTIFX};
 
 	if(mesh.HasAlphas()) {
 		auto &alphas = mesh.GetAlphas();
@@ -647,33 +642,33 @@ void unirender::cycles::Renderer::SyncMesh(const unirender::Mesh &mesh)
 	}
 }
 
-void unirender::cycles::Renderer::SyncCamera(const unirender::Camera &cam, bool update)
+void pragma::scenekit::cycles::Renderer::SyncCamera(const pragma::scenekit::Camera &cam, bool update)
 {
 	auto &cclCam = *(*this)->camera;
 
 	switch(cam.GetType()) {
-	case unirender::Camera::CameraType::Perspective:
+	case pragma::scenekit::Camera::CameraType::Perspective:
 		cclCam.set_camera_type(ccl::CameraType::CAMERA_PERSPECTIVE);
 		break;
-	case unirender::Camera::CameraType::Orthographic:
+	case pragma::scenekit::Camera::CameraType::Orthographic:
 		cclCam.set_camera_type(ccl::CameraType::CAMERA_ORTHOGRAPHIC);
 		break;
-	case unirender::Camera::CameraType::Panorama:
+	case pragma::scenekit::Camera::CameraType::Panorama:
 		cclCam.set_camera_type(ccl::CameraType::CAMERA_PANORAMA);
 		break;
 	}
 
 	switch(cam.GetPanoramaType()) {
-	case unirender::Camera::PanoramaType::Equirectangular:
+	case pragma::scenekit::Camera::PanoramaType::Equirectangular:
 		cclCam.set_panorama_type(ccl::PanoramaType::PANORAMA_EQUIRECTANGULAR);
 		break;
-	case unirender::Camera::PanoramaType::FisheyeEquidistant:
+	case pragma::scenekit::Camera::PanoramaType::FisheyeEquidistant:
 		cclCam.set_panorama_type(ccl::PanoramaType::PANORAMA_FISHEYE_EQUIDISTANT);
 		break;
-	case unirender::Camera::PanoramaType::FisheyeEquisolid:
+	case pragma::scenekit::Camera::PanoramaType::FisheyeEquisolid:
 		cclCam.set_panorama_type(ccl::PanoramaType::PANORAMA_FISHEYE_EQUISOLID);
 		break;
-	case unirender::Camera::PanoramaType::Mirrorball:
+	case pragma::scenekit::Camera::PanoramaType::Mirrorball:
 		cclCam.set_panorama_type(ccl::PanoramaType::PANORAMA_MIRRORBALL);
 		break;
 	}
@@ -702,13 +697,13 @@ void unirender::cycles::Renderer::SyncCamera(const unirender::Camera &cam, bool 
 	if(cam.IsDofEnabled() == false)
 		cclCam.set_aperturesize(0.f);
 	auto pose = cam.GetPose();
-	if(cam.GetType() == unirender::Camera::CameraType::Panorama) {
+	if(cam.GetType() == pragma::scenekit::Camera::CameraType::Panorama) {
 		auto rot = cam.GetRotation();
 		switch(cam.GetPanoramaType()) {
-		case unirender::Camera::PanoramaType::Mirrorball:
+		case pragma::scenekit::Camera::PanoramaType::Mirrorball:
 			rot *= uquat::create(EulerAngles {-90.f, 0.f, 0.f});
 			break;
-		case unirender::Camera::PanoramaType::FisheyeEquisolid:
+		case pragma::scenekit::Camera::PanoramaType::FisheyeEquisolid:
 			cclCam.set_fisheye_lens(10.5f);
 			cclCam.set_fisheye_fov(180.f);
 			// No break is intentional!
@@ -725,7 +720,7 @@ void unirender::cycles::Renderer::SyncCamera(const unirender::Camera &cam, bool 
 	if(update)
 		return;
 	//
-	auto &logger = unirender::get_logger();
+	auto &logger = pragma::scenekit::get_logger();
 	if(logger) {
 		logger->info("Camera settings:");
 		logger->info("\tWidth: {}", cclCam.get_full_width());
@@ -856,7 +851,7 @@ void unirender::cycles::Renderer::SyncCamera(const unirender::Camera &cam, bool 
 	*(*this)->dicing_camera = cclCam;
 }
 
-void unirender::cycles::Renderer::SyncLight(unirender::Scene &scene, const unirender::Light &light, bool update)
+void pragma::scenekit::cycles::Renderer::SyncLight(pragma::scenekit::Scene &scene, const pragma::scenekit::Light &light, bool update)
 {
 	ccl::Light *cclLight = nullptr;
 	if(update) {
@@ -872,41 +867,41 @@ void unirender::cycles::Renderer::SyncLight(unirender::Scene &scene, const unire
 	}
 	cclLight->set_tfm(ccl::transform_identity());
 	switch(light.GetType()) {
-	case unirender::Light::Type::Spot:
+	case pragma::scenekit::Light::Type::Spot:
 		cclLight->set_light_type(ccl::LightType::LIGHT_SPOT);
 		break;
-	case unirender::Light::Type::Directional:
+	case pragma::scenekit::Light::Type::Directional:
 		cclLight->set_light_type(ccl::LightType::LIGHT_DISTANT);
 		break;
-	case unirender::Light::Type::Area:
+	case pragma::scenekit::Light::Type::Area:
 		cclLight->set_light_type(ccl::LightType::LIGHT_AREA);
 		break;
-	case unirender::Light::Type::Background:
+	case pragma::scenekit::Light::Type::Background:
 		cclLight->set_light_type(ccl::LightType::LIGHT_BACKGROUND);
 		break;
-	case unirender::Light::Type::Triangle:
+	case pragma::scenekit::Light::Type::Triangle:
 		cclLight->set_light_type(ccl::LightType::LIGHT_TRIANGLE);
 		break;
-	case unirender::Light::Type::Point:
+	case pragma::scenekit::Light::Type::Point:
 	default:
 		cclLight->set_light_type(ccl::LightType::LIGHT_POINT);
 		break;
 	}
 
 	switch(light.GetType()) {
-	case unirender::Light::Type::Point:
+	case pragma::scenekit::Light::Type::Point:
 		{
 			break;
 		}
-	case unirender::Light::Type::Spot:
+	case pragma::scenekit::Light::Type::Spot:
 		{
 			cclLight->set_spot_smooth(light.GetBlendFraction());
 			cclLight->set_spot_angle(umath::deg_to_rad(light.GetOuterConeAngle()));
 			break;
 		}
-	case unirender::Light::Type::Directional:
+	case pragma::scenekit::Light::Type::Directional:
 		break;
-	case unirender::Light::Type::Area:
+	case pragma::scenekit::Light::Type::Area:
 		{
 			auto &axisU = light.GetAxisU();
 			auto &axisV = light.GetAxisV();
@@ -926,11 +921,11 @@ void unirender::cycles::Renderer::SyncLight(unirender::Scene &scene, const unire
 			//cclLight->set_dir(ToCyclesNormal(forward));
 			break;
 		}
-	case unirender::Light::Type::Background:
+	case pragma::scenekit::Light::Type::Background:
 		{
 			break;
 		}
-	case unirender::Light::Type::Triangle:
+	case pragma::scenekit::Light::Type::Triangle:
 		{
 			break;
 		}
@@ -940,10 +935,10 @@ void unirender::cycles::Renderer::SyncLight(unirender::Scene &scene, const unire
 	// Unsure what this property is for or why it's enabled by default, but by disabling it we get the old behavior back.
 	cclLight->set_is_sphere(false);
 
-	auto lightType = (light.GetType() == unirender::Light::Type::Spot) ? pragma::LightType::Spot : (light.GetType() == unirender::Light::Type::Directional) ? pragma::LightType::Directional : pragma::LightType::Point;
+	auto lightType = (light.GetType() == pragma::scenekit::Light::Type::Spot) ? pragma::LightType::Spot : (light.GetType() == pragma::scenekit::Light::Type::Directional) ? pragma::LightType::Directional : pragma::LightType::Point;
 	auto watt = (lightType == pragma::LightType::Spot) ? ulighting::cycles::lumen_to_watt_spot(light.GetIntensity(), light.GetColor(), light.GetOuterConeAngle())
 	  : (lightType == pragma::LightType::Point)        ? ulighting::cycles::lumen_to_watt_point(light.GetIntensity(), light.GetColor())
-	                                                         : ulighting::cycles::lumen_to_watt_area(light.GetIntensity(), light.GetColor());
+	                                                   : ulighting::cycles::lumen_to_watt_area(light.GetIntensity(), light.GetColor());
 
 	// Multiple importance sampling. It's disabled by default for some reason, but it's usually best to keep it on.
 	// cclLight->set_use_mis(true);
@@ -996,8 +991,8 @@ void unirender::cycles::Renderer::SyncLight(unirender::Scene &scene, const unire
 	auto desc = GroupNodeDesc::Create(scene.GetShaderNodeManager());
 	auto &outputNode = desc->AddNode(NODE_OUTPUT);
 	auto &nodeEmission = desc->AddNode(NODE_EMISSION);
-	nodeEmission.SetProperty(unirender::nodes::emission::IN_STRENGTH, 1.f);
-	nodeEmission.SetProperty(unirender::nodes::emission::IN_COLOR, Vector3 {1.f, 1.f, 1.f});
+	nodeEmission.SetProperty(pragma::scenekit::nodes::emission::IN_STRENGTH, 1.f);
+	nodeEmission.SetProperty(pragma::scenekit::nodes::emission::IN_COLOR, Vector3 {1.f, 1.f, 1.f});
 	desc->Link(nodeEmission.GetOutputSocket("emission"), outputNode.GetInputSocket("surface"));
 
 	auto shader = CCLShader::Create(*this, *desc);
@@ -1005,7 +1000,7 @@ void unirender::cycles::Renderer::SyncLight(unirender::Scene &scene, const unire
 	m_lightToShader[&light] = shader;
 }
 
-ccl::BufferParams unirender::cycles::Renderer::GetBufferParameters() const
+ccl::BufferParams pragma::scenekit::cycles::Renderer::GetBufferParameters() const
 {
 	auto &cam = m_scene->GetCamera();
 	ccl::BufferParams bufferParams {};
@@ -1017,35 +1012,35 @@ ccl::BufferParams unirender::cycles::Renderer::GetBufferParameters() const
 	return bufferParams;
 }
 
-float unirender::cycles::Renderer::GetProgress() const { return m_cclSession->progress.get_progress(); }
-bool unirender::cycles::Renderer::Stop() { return false; }
-bool unirender::cycles::Renderer::Pause()
+float pragma::scenekit::cycles::Renderer::GetProgress() const { return m_cclSession->progress.get_progress(); }
+bool pragma::scenekit::cycles::Renderer::Stop() { return false; }
+bool pragma::scenekit::cycles::Renderer::Pause()
 {
 	if(!m_cclSession)
 		return false;
 	m_cclSession->set_pause(true);
 	return true;
 }
-bool unirender::cycles::Renderer::Resume()
+bool pragma::scenekit::cycles::Renderer::Resume()
 {
 	if(!m_cclSession)
 		return false;
 	m_cclSession->set_pause(false);
 	return true;
 }
-bool unirender::cycles::Renderer::Suspend() { return false; }
-bool unirender::cycles::Renderer::Export(const std::string &path) { return false; }
-void unirender::cycles::Renderer::Wait()
+bool pragma::scenekit::cycles::Renderer::Suspend() { return false; }
+bool pragma::scenekit::cycles::Renderer::Export(const std::string &path) { return false; }
+void pragma::scenekit::cycles::Renderer::Wait()
 {
 	if(m_cclSession)
 		m_cclSession->wait();
 }
 
-void unirender::cycles::Renderer::ApplyPostProcessing(uimg::ImageBuffer &imgBuffer, unirender::Scene::RenderMode renderMode)
+void pragma::scenekit::cycles::Renderer::ApplyPostProcessing(uimg::ImageBuffer &imgBuffer, pragma::scenekit::Scene::RenderMode renderMode)
 {
 	// For some reason the image is flipped horizontally when rendering an image,
 	// so we'll just flip it the right way here
-	auto flipHorizontally = unirender::Scene::IsRenderSceneMode(renderMode);
+	auto flipHorizontally = pragma::scenekit::Scene::IsRenderSceneMode(renderMode);
 	if(m_cclScene->camera->get_camera_type() == ccl::CameraType::CAMERA_PANORAMA) {
 		switch(m_cclScene->camera->get_panorama_type()) {
 		case ccl::PanoramaType::PANORAMA_EQUIRECTANGULAR:
@@ -1063,7 +1058,7 @@ void unirender::cycles::Renderer::ApplyPostProcessing(uimg::ImageBuffer &imgBuff
 	imgBuffer.ClearAlpha();
 }
 
-std::optional<uint32_t> unirender::cycles::Renderer::FindCCLObjectId(const ccl::Object &o) const
+std::optional<uint32_t> pragma::scenekit::cycles::Renderer::FindCCLObjectId(const ccl::Object &o) const
 {
 	auto it = std::find(m_cclScene->objects.begin(), m_cclScene->objects.end(), &o);
 	return (it != m_cclScene->objects.end()) ? (it - m_cclScene->objects.begin()) : std::optional<uint32_t> {};
@@ -1148,8 +1143,6 @@ static void session_print_status(Options &opts)
 	//session_print(status);
 }
 
-#include <app/oiio_output_driver.h>
-
 class COIIOOutputDriver : public ccl::OutputDriver {
   public:
 	typedef ccl::function<void(const ccl::string &)> LogFunction;
@@ -1203,7 +1196,7 @@ void COIIOOutputDriver::write_render_tile(const Tile &tile)
 	image_output->close();
 }
 
-void unirender::cycles::Renderer::AddDebugSky()
+void pragma::scenekit::cycles::Renderer::AddDebugSky()
 {
 	auto *shader = m_cclScene->default_background;
 	auto *graph = new ccl::ShaderGraph();
@@ -1230,7 +1223,7 @@ void unirender::cycles::Renderer::AddDebugSky()
 	shader->tag_update(m_cclScene);
 }
 
-ccl::Mesh *unirender::cycles::Renderer::AddDebugMesh()
+ccl::Mesh *pragma::scenekit::cycles::Renderer::AddDebugMesh()
 {
 	auto *cclMesh = new ccl::Mesh {};
 	m_cclScene->geometry.push_back(cclMesh);
@@ -1279,7 +1272,7 @@ ccl::Mesh *unirender::cycles::Renderer::AddDebugMesh()
 	}
 	return cclMesh;
 }
-ccl::Object *unirender::cycles::Renderer::AddDebugObject()
+ccl::Object *pragma::scenekit::cycles::Renderer::AddDebugObject()
 {
 	auto *mesh = AddDebugMesh();
 	ccl::Object *object = new ccl::Object();
@@ -1289,7 +1282,7 @@ ccl::Object *unirender::cycles::Renderer::AddDebugObject()
 	m_cclScene->objects.push_back(object);
 	return object;
 }
-void unirender::cycles::Renderer::AddDebugLight()
+void pragma::scenekit::cycles::Renderer::AddDebugLight()
 {
 	auto *shader = new ccl::Shader {};
 	shader->name = "point_shader";
@@ -1317,7 +1310,7 @@ void unirender::cycles::Renderer::AddDebugLight()
 	light->set_size(1.f);
 	light->set_tfm(ccl::transform_translate({0.f, 0.f, 1.f}));
 }
-ccl::Shader *unirender::cycles::Renderer::AddDebugShader()
+ccl::Shader *pragma::scenekit::cycles::Renderer::AddDebugShader()
 {
 	auto *shader = new ccl::Shader {};
 	shader->name = "shader_test";
@@ -1348,7 +1341,7 @@ ccl::Shader *unirender::cycles::Renderer::AddDebugShader()
 	return shader;
 }
 
-void unirender::cycles::Renderer::InitializeDebugScene(const std::string &fileName, const std::vector<std::string> &xmlFileNames)
+void pragma::scenekit::cycles::Renderer::InitializeDebugScene(const std::string &fileName, const std::vector<std::string> &xmlFileNames)
 {
 	Options opts {};
 
@@ -1402,7 +1395,7 @@ void unirender::cycles::Renderer::InitializeDebugScene(const std::string &fileNa
 	m_cclSession = nullptr;
 }
 
-void unirender::cycles::Renderer::PopulateDebugScene()
+void pragma::scenekit::cycles::Renderer::PopulateDebugScene()
 {
 	AddDebugSky();
 	auto *obj = AddDebugObject();
@@ -1415,11 +1408,11 @@ void unirender::cycles::Renderer::PopulateDebugScene()
 	mesh->set_used_shaders(used_shaders);
 }
 
-bool unirender::cycles::Renderer::BeginSceneEdit() { return true; }
-bool unirender::cycles::Renderer::EndSceneEdit() { return true; }
-bool unirender::cycles::Renderer::AddLiveActor(unirender::WorldObject &actor)
+bool pragma::scenekit::cycles::Renderer::BeginSceneEdit() { return true; }
+bool pragma::scenekit::cycles::Renderer::EndSceneEdit() { return true; }
+bool pragma::scenekit::cycles::Renderer::AddLiveActor(pragma::scenekit::WorldObject &actor)
 {
-	auto *pLight = dynamic_cast<unirender::Light *>(&actor);
+	auto *pLight = dynamic_cast<pragma::scenekit::Light *>(&actor);
 	if(!pLight)
 		return false;
 	GetScene().AddLight(*pLight);
@@ -1431,7 +1424,7 @@ bool unirender::cycles::Renderer::AddLiveActor(unirender::WorldObject &actor)
 	it->second->Finalize(*m_scene);
 	return true;
 }
-bool unirender::cycles::Renderer::SyncEditedActor(const util::Uuid &uuid)
+bool pragma::scenekit::cycles::Renderer::SyncEditedActor(const util::Uuid &uuid)
 {
 	auto *actor = FindActor(uuid);
 	if(!actor)
@@ -1483,7 +1476,7 @@ bool unirender::cycles::Renderer::SyncEditedActor(const util::Uuid &uuid)
 	return true;
 }
 
-bool unirender::cycles::Renderer::Initialize(unirender::Scene &scene, std::string &outErr)
+bool pragma::scenekit::cycles::Renderer::Initialize(pragma::scenekit::Scene &scene, std::string &outErr)
 {
 	auto devInfo = InitializeDevice(scene, outErr);
 	if(devInfo.has_value() == false)
@@ -1510,7 +1503,7 @@ bool unirender::cycles::Renderer::Initialize(unirender::Scene &scene, std::strin
 		std::string deviceName = "CPU";
 		udmDebugStandalone["device"](deviceName);
 
-		auto &logger = unirender::get_logger();
+		auto &logger = pragma::scenekit::get_logger();
 		if(logger)
 			logger->info("Selected device: {}", deviceName);
 
@@ -1551,11 +1544,11 @@ bool unirender::cycles::Renderer::Initialize(unirender::Scene &scene, std::strin
 	}
 
 	switch(scene.GetRenderMode()) {
-	case unirender::Scene::RenderMode::BakeDiffuseLightingSeparate:
+	case pragma::scenekit::Scene::RenderMode::BakeDiffuseLightingSeparate:
 		AddPass(PassType::DiffuseDirect);
 		AddPass(PassType::DiffuseIndirect);
 		break;
-	case unirender::Scene::RenderMode::RenderImage:
+	case pragma::scenekit::Scene::RenderMode::RenderImage:
 		{
 			AddPass(PassType::Combined);
 			if(umath::is_flag_set(m_stateFlags, StateFlags::NativeDenoising)) {
@@ -1570,7 +1563,7 @@ bool unirender::cycles::Renderer::Initialize(unirender::Scene &scene, std::strin
 			if(passType)
 				AddPass(*passType);
 			else {
-				auto &logger = unirender::get_logger();
+				auto &logger = pragma::scenekit::get_logger();
 				if(logger)
 					logger->error("Unsupported render mode: {}", magic_enum::enum_name(scene.GetRenderMode()));
 				return false;
@@ -1589,7 +1582,7 @@ bool unirender::cycles::Renderer::Initialize(unirender::Scene &scene, std::strin
 		m_cclScene->integrator->set_denoiser_type(denoiserType);
 		m_cclScene->integrator->set_denoise_start_sample(1);
 		// m_cclScene->integrator->set_denoiser_prefilter(ccl::DenoiserPrefilter::DENOISER_PREFILTER_FAST);
-		if(umath::is_flag_set(static_cast<unirender::Renderer::Flags>(m_flags), Flags::EnableLiveEditing)) {
+		if(umath::is_flag_set(static_cast<pragma::scenekit::Renderer::Flags>(m_flags), Flags::EnableLiveEditing)) {
 			m_cclScene->integrator->set_use_denoise_pass_albedo(true);
 			m_cclScene->integrator->set_use_denoise_pass_normal(false);
 		}
@@ -1821,7 +1814,7 @@ bool unirender::cycles::Renderer::Initialize(unirender::Scene &scene, std::strin
 	return true;
 }
 
-void unirender::cycles::Renderer::InitializePassShaders(const std::function<std::shared_ptr<GroupNodeDesc>(const Shader &)> &fGetPassDesc)
+void pragma::scenekit::cycles::Renderer::InitializePassShaders(const std::function<std::shared_ptr<GroupNodeDesc>(const Shader &)> &fGetPassDesc)
 {
 	std::unordered_map<Shader *, std::shared_ptr<CCLShader>> shaderCache;
 	for(auto &chunk : m_renderData.modelCache->GetChunks()) {
@@ -1855,7 +1848,7 @@ void unirender::cycles::Renderer::InitializePassShaders(const std::function<std:
 	}
 }
 
-void unirender::cycles::Renderer::InitializeAlbedoPass(bool reloadShaders)
+void pragma::scenekit::cycles::Renderer::InitializeAlbedoPass(bool reloadShaders)
 {
 	auto bufferParams = GetBufferParameters();
 	uint32_t sampleCount = 1;
@@ -1942,9 +1935,9 @@ void unirender::cycles::Renderer::InitializeAlbedoPass(bool reloadShaders)
 #endif
 }
 
-void unirender::cycles::Renderer::InitializeNormalPass(bool reloadShaders)
+void pragma::scenekit::cycles::Renderer::InitializeNormalPass(bool reloadShaders)
 {
-	// Also see unirender::Scene::CreateShader
+	// Also see pragma::scenekit::Scene::CreateShader
 	auto bufferParams = GetBufferParameters();
 	uint32_t sampleCount = 1;
 	auto &createInfo = m_scene->GetCreateInfo();
@@ -1957,7 +1950,7 @@ void unirender::cycles::Renderer::InitializeNormalPass(bool reloadShaders)
 	m_cclSession->reset(m_cclSession->params, bufferParams); // We only need the normals and albedo colors for the first sample
 
 	// Disable the sky (by making it black)
-	auto shader = unirender::GroupNodeDesc::Create(m_scene->GetShaderNodeManager());
+	auto shader = pragma::scenekit::GroupNodeDesc::Create(m_scene->GetShaderNodeManager());
 
 	auto &nodeOutput = shader->AddNode(NODE_OUTPUT);
 	auto &nodeBg = shader->AddNode(NODE_BACKGROUND_SHADER);
@@ -2021,7 +2014,7 @@ void unirender::cycles::Renderer::InitializeNormalPass(bool reloadShaders)
 #endif
 }
 
-std::shared_ptr<unirender::CCLShader> unirender::cycles::Renderer::GetCachedShader(const GroupNodeDesc &desc) const
+std::shared_ptr<pragma::scenekit::CCLShader> pragma::scenekit::cycles::Renderer::GetCachedShader(const GroupNodeDesc &desc) const
 {
 	auto it = m_shaderCache.find(&desc);
 	if(it == m_shaderCache.end())
@@ -2030,21 +2023,21 @@ std::shared_ptr<unirender::CCLShader> unirender::cycles::Renderer::GetCachedShad
 	return m_cclShaders.at(idx);
 }
 
-void unirender::cycles::Renderer::AddShader(CCLShader &shader, const GroupNodeDesc *optDesc)
+void pragma::scenekit::cycles::Renderer::AddShader(CCLShader &shader, const GroupNodeDesc *optDesc)
 {
 	m_cclShaders.push_back(shader.shared_from_this());
 	if(optDesc)
 		m_shaderCache[optDesc] = m_cclShaders.size() - 1;
 }
 
-void unirender::cycles::Renderer::Reset()
+void pragma::scenekit::cycles::Renderer::Reset()
 {
 	m_restartState = 1;
 	SetCancelled("Cancelled by user");
 	m_cclSession->wait();
 	m_cclSession->progress.reset();
 }
-void unirender::cycles::Renderer::Restart()
+void pragma::scenekit::cycles::Renderer::Restart()
 {
 	auto &createInfo = m_scene->GetCreateInfo();
 	if(createInfo.progressive)
@@ -2053,20 +2046,20 @@ void unirender::cycles::Renderer::Restart()
 	m_cclSession->start();
 	m_restartState = 2;
 }
-std::optional<std::string> unirender::cycles::Renderer::SaveRenderPreview(const std::string &path, std::string &outErr) const
+std::optional<std::string> pragma::scenekit::cycles::Renderer::SaveRenderPreview(const std::string &path, std::string &outErr) const
 {
 	outErr = "Saving render preview not implemented for cycles.";
 	return {};
 }
 
-void unirender::cycles::Renderer::AddSkybox(const std::string &texture)
+void pragma::scenekit::cycles::Renderer::AddSkybox(const std::string &texture)
 {
 	if(umath::is_flag_set(m_stateFlags, StateFlags::SkyInitialized))
 		return;
 	umath::set_flag(m_stateFlags, StateFlags::SkyInitialized);
 
 	if(m_renderMode == Scene::RenderMode::SceneDepth) {
-		auto desc = unirender::GroupNodeDesc::Create(m_scene->GetShaderNodeManager());
+		auto desc = pragma::scenekit::GroupNodeDesc::Create(m_scene->GetShaderNodeManager());
 		auto &nodeOutput = desc->AddNode(NODE_OUTPUT);
 		auto &nodeBg = desc->AddNode(NODE_BACKGROUND_SHADER);
 		nodeBg.SetProperty(nodes::background_shader::IN_STRENGTH, 1'000.f);
@@ -2088,7 +2081,7 @@ void unirender::cycles::Renderer::AddSkybox(const std::string &texture)
 		return;
 
 	// Setup the skybox as a background shader
-	auto desc = unirender::GroupNodeDesc::Create(m_scene->GetShaderNodeManager());
+	auto desc = pragma::scenekit::GroupNodeDesc::Create(m_scene->GetShaderNodeManager());
 	auto &nodeOutput = desc->AddNode(NODE_OUTPUT);
 	auto &nodeBg = desc->AddNode(NODE_BACKGROUND_SHADER);
 	nodeBg.SetProperty(nodes::background_shader::IN_STRENGTH, sceneInfo.skyStrength);
@@ -2123,7 +2116,7 @@ void unirender::cycles::Renderer::AddSkybox(const std::string &texture)
 	light->tag_update(m_cclScene);
 }
 
-bool unirender::cycles::Renderer::IsFeatureEnabled(Feature feature) const
+bool pragma::scenekit::cycles::Renderer::IsFeatureEnabled(Feature feature) const
 {
 	switch(feature) {
 	case Feature::OptiXAvailable:
@@ -2136,10 +2129,10 @@ bool unirender::cycles::Renderer::IsFeatureEnabled(Feature feature) const
 			break;
 		}
 	}
-	return unirender::Renderer::IsFeatureEnabled(feature);
+	return pragma::scenekit::Renderer::IsFeatureEnabled(feature);
 }
 
-util::ParallelJob<uimg::ImageLayerSet> unirender::cycles::Renderer::StartRender()
+util::ParallelJob<uimg::ImageLayerSet> pragma::scenekit::cycles::Renderer::StartRender()
 {
 	auto job = util::create_parallel_job<RenderWorker>(*this);
 	auto &worker = static_cast<RenderWorker &>(job.GetWorker());
@@ -2147,7 +2140,7 @@ util::ParallelJob<uimg::ImageLayerSet> unirender::cycles::Renderer::StartRender(
 	return job;
 }
 #if 0
-void unirender::cycles::Renderer::UpdateRenderTile(unirender::TileManager &tileManager,const ccl::RenderTile &tile,bool param)
+void pragma::scenekit::cycles::Renderer::UpdateRenderTile(pragma::scenekit::TileManager &tileManager,const ccl::RenderTile &tile,bool param)
 {
 	auto tileSize = tileManager.GetTileSize();
 	auto numTilesPerAxis = tileManager.GetTilesPerAxisCount();
@@ -2156,7 +2149,7 @@ void unirender::cycles::Renderer::UpdateRenderTile(unirender::TileManager &tileM
 	if((tile.x %tileSize.x) != 0 || (tile.y %tileSize.y) != 0)
 		throw std::invalid_argument{"Unexpected tile size"};
 	auto tileIndex = tile.x /tileSize.x +(tile.y /tileSize.y) *numTilesPerAxis.x;
-	unirender::TileManager::TileData data {};
+	pragma::scenekit::TileManager::TileData data {};
 	data.x = tile.x;
 	data.y = tile.y;
 	data.index = tileIndex; // tile.tile_index; // tile_index doesn't match expected tile index in some cases?
@@ -2180,7 +2173,7 @@ void unirender::cycles::Renderer::UpdateRenderTile(unirender::TileManager &tileM
 		}
 	inputTileMutex.unlock();
 }
-void unirender::cycles::Renderer::WriteRenderTile(unirender::TileManager &tileManager,const ccl::RenderTile &tile)
+void pragma::scenekit::cycles::Renderer::WriteRenderTile(pragma::scenekit::TileManager &tileManager,const ccl::RenderTile &tile)
 {
 	// TODO: What's this callback for exactly?
 }
@@ -2191,10 +2184,10 @@ void unirender::cycles::Renderer::WriteRenderTile(unirender::TileManager &tileMa
 #define DLLEXPORT __declspec(dllexport)
 #endif
 extern "C" {
-bool DLLEXPORT create_renderer(const unirender::Scene &scene, unirender::Renderer::Flags flags, std::shared_ptr<unirender::Renderer> &outRenderer, std::string &outErr)
+bool DLLEXPORT create_renderer(const pragma::scenekit::Scene &scene, pragma::scenekit::Renderer::Flags flags, std::shared_ptr<pragma::scenekit::Renderer> &outRenderer, std::string &outErr)
 {
 	auto kernelPath = util::get_program_path() + "/modules/unirender/cycles";
-	unirender::Scene::SetKernelPath(kernelPath);
+	pragma::scenekit::Scene::SetKernelPath(kernelPath);
 
 	// Cycles can build the kernels during runtime if they don't exist, but unfortunately
 	// it refuses to do so if the "lib" directory exists (because it assumes that the kernels have been
@@ -2209,7 +2202,7 @@ bool DLLEXPORT create_renderer(const unirender::Scene &scene, unirender::Rendere
 			filemanager::remove_system_directory(libPath);
 	}
 
-	outRenderer = unirender::cycles::Renderer::Create(scene, outErr, flags);
+	outRenderer = pragma::scenekit::cycles::Renderer::Create(scene, outErr, flags);
 	return outRenderer != nullptr;
 }
 };

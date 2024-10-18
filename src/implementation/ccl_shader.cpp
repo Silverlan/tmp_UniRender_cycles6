@@ -5,393 +5,396 @@
 * Copyright (c) 2023 Silverlan
 */
 
-#include "util_raytracing/shader.hpp"
-#include "unirender/cycles/ccl_shader.hpp"
-#include "util_raytracing/scene.hpp"
-#include "util_raytracing/mesh.hpp"
-#include "util_raytracing/exception.hpp"
-#include "unirender/cycles/renderer.hpp"
+module;
+
 #include <spdlog/logger.h>
-#include <sharedutils/util_path.hpp>
-#include <sharedutils/util_string.h>
 #include <scene/shader.h>
 #include <scene/shader_graph.h>
 #include <scene/scene.h>
 #include <scene/shader_nodes.h>
 #include <OpenImageIO/ustring.h>
+#include <sharedutils/util_path.hpp>
+#include <sharedutils/util_string.h>
 #include <fsys/filesystem.h>
+#include <udm.hpp>
 
-ccl::NodeMathType unirender::cycles::to_ccl_type(unirender::nodes::math::MathType type)
+module pragma.scenekit.cycles;
+
+import pragma.scenekit;
+
+ccl::NodeMathType pragma::scenekit::cycles::to_ccl_type(pragma::scenekit::nodes::math::MathType type)
 {
 	switch(type) {
-	case unirender::nodes::math::MathType::Add:
+	case pragma::scenekit::nodes::math::MathType::Add:
 		return ccl::NodeMathType::NODE_MATH_ADD;
-	case unirender::nodes::math::MathType::Subtract:
+	case pragma::scenekit::nodes::math::MathType::Subtract:
 		return ccl::NodeMathType::NODE_MATH_SUBTRACT;
-	case unirender::nodes::math::MathType::Multiply:
+	case pragma::scenekit::nodes::math::MathType::Multiply:
 		return ccl::NodeMathType::NODE_MATH_MULTIPLY;
-	case unirender::nodes::math::MathType::Divide:
+	case pragma::scenekit::nodes::math::MathType::Divide:
 		return ccl::NodeMathType::NODE_MATH_DIVIDE;
-	case unirender::nodes::math::MathType::Sine:
+	case pragma::scenekit::nodes::math::MathType::Sine:
 		return ccl::NodeMathType::NODE_MATH_SINE;
-	case unirender::nodes::math::MathType::Cosine:
+	case pragma::scenekit::nodes::math::MathType::Cosine:
 		return ccl::NodeMathType::NODE_MATH_COSINE;
-	case unirender::nodes::math::MathType::Tangent:
+	case pragma::scenekit::nodes::math::MathType::Tangent:
 		return ccl::NodeMathType::NODE_MATH_TANGENT;
-	case unirender::nodes::math::MathType::ArcSine:
+	case pragma::scenekit::nodes::math::MathType::ArcSine:
 		return ccl::NodeMathType::NODE_MATH_ARCSINE;
-	case unirender::nodes::math::MathType::ArcCosine:
+	case pragma::scenekit::nodes::math::MathType::ArcCosine:
 		return ccl::NodeMathType::NODE_MATH_ARCCOSINE;
-	case unirender::nodes::math::MathType::ArcTangent:
+	case pragma::scenekit::nodes::math::MathType::ArcTangent:
 		return ccl::NodeMathType::NODE_MATH_ARCTANGENT;
-	case unirender::nodes::math::MathType::Power:
+	case pragma::scenekit::nodes::math::MathType::Power:
 		return ccl::NodeMathType::NODE_MATH_POWER;
-	case unirender::nodes::math::MathType::Logarithm:
+	case pragma::scenekit::nodes::math::MathType::Logarithm:
 		return ccl::NodeMathType::NODE_MATH_LOGARITHM;
-	case unirender::nodes::math::MathType::Minimum:
+	case pragma::scenekit::nodes::math::MathType::Minimum:
 		return ccl::NodeMathType::NODE_MATH_MINIMUM;
-	case unirender::nodes::math::MathType::Maximum:
+	case pragma::scenekit::nodes::math::MathType::Maximum:
 		return ccl::NodeMathType::NODE_MATH_MAXIMUM;
-	case unirender::nodes::math::MathType::Round:
+	case pragma::scenekit::nodes::math::MathType::Round:
 		return ccl::NodeMathType::NODE_MATH_ROUND;
-	case unirender::nodes::math::MathType::LessThan:
+	case pragma::scenekit::nodes::math::MathType::LessThan:
 		return ccl::NodeMathType::NODE_MATH_LESS_THAN;
-	case unirender::nodes::math::MathType::GreaterThan:
+	case pragma::scenekit::nodes::math::MathType::GreaterThan:
 		return ccl::NodeMathType::NODE_MATH_GREATER_THAN;
-	case unirender::nodes::math::MathType::Modulo:
+	case pragma::scenekit::nodes::math::MathType::Modulo:
 		return ccl::NodeMathType::NODE_MATH_MODULO;
-	case unirender::nodes::math::MathType::Absolute:
+	case pragma::scenekit::nodes::math::MathType::Absolute:
 		return ccl::NodeMathType::NODE_MATH_ABSOLUTE;
-	case unirender::nodes::math::MathType::ArcTan2:
+	case pragma::scenekit::nodes::math::MathType::ArcTan2:
 		return ccl::NodeMathType::NODE_MATH_ARCTAN2;
-	case unirender::nodes::math::MathType::Floor:
+	case pragma::scenekit::nodes::math::MathType::Floor:
 		return ccl::NodeMathType::NODE_MATH_FLOOR;
-	case unirender::nodes::math::MathType::Ceil:
+	case pragma::scenekit::nodes::math::MathType::Ceil:
 		return ccl::NodeMathType::NODE_MATH_CEIL;
-	case unirender::nodes::math::MathType::Fraction:
+	case pragma::scenekit::nodes::math::MathType::Fraction:
 		return ccl::NodeMathType::NODE_MATH_FRACTION;
-	case unirender::nodes::math::MathType::Sqrt:
+	case pragma::scenekit::nodes::math::MathType::Sqrt:
 		return ccl::NodeMathType::NODE_MATH_SQRT;
-	case unirender::nodes::math::MathType::InvSqrt:
+	case pragma::scenekit::nodes::math::MathType::InvSqrt:
 		return ccl::NodeMathType::NODE_MATH_INV_SQRT;
-	case unirender::nodes::math::MathType::Sign:
+	case pragma::scenekit::nodes::math::MathType::Sign:
 		return ccl::NodeMathType::NODE_MATH_SIGN;
-	case unirender::nodes::math::MathType::Exponent:
+	case pragma::scenekit::nodes::math::MathType::Exponent:
 		return ccl::NodeMathType::NODE_MATH_EXPONENT;
-	case unirender::nodes::math::MathType::Radians:
+	case pragma::scenekit::nodes::math::MathType::Radians:
 		return ccl::NodeMathType::NODE_MATH_RADIANS;
-	case unirender::nodes::math::MathType::Degrees:
+	case pragma::scenekit::nodes::math::MathType::Degrees:
 		return ccl::NodeMathType::NODE_MATH_DEGREES;
-	case unirender::nodes::math::MathType::SinH:
+	case pragma::scenekit::nodes::math::MathType::SinH:
 		return ccl::NodeMathType::NODE_MATH_SINH;
-	case unirender::nodes::math::MathType::CosH:
+	case pragma::scenekit::nodes::math::MathType::CosH:
 		return ccl::NodeMathType::NODE_MATH_COSH;
-	case unirender::nodes::math::MathType::TanH:
+	case pragma::scenekit::nodes::math::MathType::TanH:
 		return ccl::NodeMathType::NODE_MATH_TANH;
-	case unirender::nodes::math::MathType::Trunc:
+	case pragma::scenekit::nodes::math::MathType::Trunc:
 		return ccl::NodeMathType::NODE_MATH_TRUNC;
-	case unirender::nodes::math::MathType::Snap:
+	case pragma::scenekit::nodes::math::MathType::Snap:
 		return ccl::NodeMathType::NODE_MATH_SNAP;
-	case unirender::nodes::math::MathType::Wrap:
+	case pragma::scenekit::nodes::math::MathType::Wrap:
 		return ccl::NodeMathType::NODE_MATH_WRAP;
-	case unirender::nodes::math::MathType::Compare:
+	case pragma::scenekit::nodes::math::MathType::Compare:
 		return ccl::NodeMathType::NODE_MATH_COMPARE;
-	case unirender::nodes::math::MathType::MultiplyAdd:
+	case pragma::scenekit::nodes::math::MathType::MultiplyAdd:
 		return ccl::NodeMathType::NODE_MATH_MULTIPLY_ADD;
-	case unirender::nodes::math::MathType::PingPong:
+	case pragma::scenekit::nodes::math::MathType::PingPong:
 		return ccl::NodeMathType::NODE_MATH_PINGPONG;
-	case unirender::nodes::math::MathType::SmoothMin:
+	case pragma::scenekit::nodes::math::MathType::SmoothMin:
 		return ccl::NodeMathType::NODE_MATH_SMOOTH_MIN;
-	case unirender::nodes::math::MathType::SmoothMax:
+	case pragma::scenekit::nodes::math::MathType::SmoothMax:
 		return ccl::NodeMathType::NODE_MATH_SMOOTH_MAX;
 	}
-	static_assert(umath::to_integral(unirender::nodes::math::MathType::Add) == ccl::NodeMathType::NODE_MATH_ADD && umath::to_integral(unirender::nodes::math::MathType::SmoothMax) == ccl::NodeMathType::NODE_MATH_SMOOTH_MAX);
-	static_assert(umath::to_integral(unirender::nodes::math::MathType::Count) == 40);
+	static_assert(umath::to_integral(pragma::scenekit::nodes::math::MathType::Add) == ccl::NodeMathType::NODE_MATH_ADD && umath::to_integral(pragma::scenekit::nodes::math::MathType::SmoothMax) == ccl::NodeMathType::NODE_MATH_SMOOTH_MAX);
+	static_assert(umath::to_integral(pragma::scenekit::nodes::math::MathType::Count) == 40);
 	// Unreachable
 	return {};
 }
-ccl::NodeVectorTransformType unirender::cycles::to_ccl_type(unirender::nodes::vector_transform::Type type)
+ccl::NodeVectorTransformType pragma::scenekit::cycles::to_ccl_type(pragma::scenekit::nodes::vector_transform::Type type)
 {
 	switch(type) {
-	case unirender::nodes::vector_transform::Type::Vector:
+	case pragma::scenekit::nodes::vector_transform::Type::Vector:
 		return ccl::NodeVectorTransformType::NODE_VECTOR_TRANSFORM_TYPE_VECTOR;
-	case unirender::nodes::vector_transform::Type::Point:
+	case pragma::scenekit::nodes::vector_transform::Type::Point:
 		return ccl::NodeVectorTransformType::NODE_VECTOR_TRANSFORM_TYPE_POINT;
-	case unirender::nodes::vector_transform::Type::Normal:
+	case pragma::scenekit::nodes::vector_transform::Type::Normal:
 		return ccl::NodeVectorTransformType::NODE_VECTOR_TRANSFORM_TYPE_NORMAL;
 	};
-	static_assert(umath::to_integral(unirender::nodes::vector_transform::Type::Count) == 4);
+	static_assert(umath::to_integral(pragma::scenekit::nodes::vector_transform::Type::Count) == 4);
 	// Unreachable
 	return {};
 }
-ccl::NodeVectorMathType unirender::cycles::to_ccl_type(unirender::nodes::vector_math::MathType type)
+ccl::NodeVectorMathType pragma::scenekit::cycles::to_ccl_type(pragma::scenekit::nodes::vector_math::MathType type)
 {
 	switch(type) {
-	case unirender::nodes::vector_math::MathType::Add:
+	case pragma::scenekit::nodes::vector_math::MathType::Add:
 		return ccl::NodeVectorMathType::NODE_VECTOR_MATH_ADD;
-	case unirender::nodes::vector_math::MathType::Subtract:
+	case pragma::scenekit::nodes::vector_math::MathType::Subtract:
 		return ccl::NodeVectorMathType::NODE_VECTOR_MATH_SUBTRACT;
-	case unirender::nodes::vector_math::MathType::Multiply:
+	case pragma::scenekit::nodes::vector_math::MathType::Multiply:
 		return ccl::NodeVectorMathType::NODE_VECTOR_MATH_MULTIPLY;
-	case unirender::nodes::vector_math::MathType::Divide:
+	case pragma::scenekit::nodes::vector_math::MathType::Divide:
 		return ccl::NodeVectorMathType::NODE_VECTOR_MATH_DIVIDE;
 
-	case unirender::nodes::vector_math::MathType::CrossProduct:
+	case pragma::scenekit::nodes::vector_math::MathType::CrossProduct:
 		return ccl::NodeVectorMathType::NODE_VECTOR_MATH_CROSS_PRODUCT;
-	case unirender::nodes::vector_math::MathType::Project:
+	case pragma::scenekit::nodes::vector_math::MathType::Project:
 		return ccl::NodeVectorMathType::NODE_VECTOR_MATH_PROJECT;
-	case unirender::nodes::vector_math::MathType::Reflect:
+	case pragma::scenekit::nodes::vector_math::MathType::Reflect:
 		return ccl::NodeVectorMathType::NODE_VECTOR_MATH_REFLECT;
-	case unirender::nodes::vector_math::MathType::DotProduct:
+	case pragma::scenekit::nodes::vector_math::MathType::DotProduct:
 		return ccl::NodeVectorMathType::NODE_VECTOR_MATH_DOT_PRODUCT;
 
-	case unirender::nodes::vector_math::MathType::Distance:
+	case pragma::scenekit::nodes::vector_math::MathType::Distance:
 		return ccl::NodeVectorMathType::NODE_VECTOR_MATH_DISTANCE;
-	case unirender::nodes::vector_math::MathType::Length:
+	case pragma::scenekit::nodes::vector_math::MathType::Length:
 		return ccl::NodeVectorMathType::NODE_VECTOR_MATH_LENGTH;
-	case unirender::nodes::vector_math::MathType::Scale:
+	case pragma::scenekit::nodes::vector_math::MathType::Scale:
 		return ccl::NodeVectorMathType::NODE_VECTOR_MATH_SCALE;
-	case unirender::nodes::vector_math::MathType::Normalize:
+	case pragma::scenekit::nodes::vector_math::MathType::Normalize:
 		return ccl::NodeVectorMathType::NODE_VECTOR_MATH_NORMALIZE;
 
-	case unirender::nodes::vector_math::MathType::Snap:
+	case pragma::scenekit::nodes::vector_math::MathType::Snap:
 		return ccl::NodeVectorMathType::NODE_VECTOR_MATH_SNAP;
-	case unirender::nodes::vector_math::MathType::Floor:
+	case pragma::scenekit::nodes::vector_math::MathType::Floor:
 		return ccl::NodeVectorMathType::NODE_VECTOR_MATH_FLOOR;
-	case unirender::nodes::vector_math::MathType::Ceil:
+	case pragma::scenekit::nodes::vector_math::MathType::Ceil:
 		return ccl::NodeVectorMathType::NODE_VECTOR_MATH_CEIL;
-	case unirender::nodes::vector_math::MathType::Modulo:
+	case pragma::scenekit::nodes::vector_math::MathType::Modulo:
 		return ccl::NodeVectorMathType::NODE_VECTOR_MATH_MODULO;
-	case unirender::nodes::vector_math::MathType::Fraction:
+	case pragma::scenekit::nodes::vector_math::MathType::Fraction:
 		return ccl::NodeVectorMathType::NODE_VECTOR_MATH_FRACTION;
-	case unirender::nodes::vector_math::MathType::Absolute:
+	case pragma::scenekit::nodes::vector_math::MathType::Absolute:
 		return ccl::NodeVectorMathType::NODE_VECTOR_MATH_ABSOLUTE;
-	case unirender::nodes::vector_math::MathType::Minimum:
+	case pragma::scenekit::nodes::vector_math::MathType::Minimum:
 		return ccl::NodeVectorMathType::NODE_VECTOR_MATH_MINIMUM;
-	case unirender::nodes::vector_math::MathType::Maximum:
+	case pragma::scenekit::nodes::vector_math::MathType::Maximum:
 		return ccl::NodeVectorMathType::NODE_VECTOR_MATH_MAXIMUM;
 	};
-	static_assert(umath::to_integral(unirender::nodes::vector_math::MathType::Add) == ccl::NodeVectorMathType::NODE_VECTOR_MATH_ADD && umath::to_integral(unirender::nodes::vector_math::MathType::Maximum) == ccl::NodeVectorMathType::NODE_VECTOR_MATH_MAXIMUM);
-	static_assert(umath::to_integral(unirender::nodes::vector_math::MathType::Count) == 20);
+	static_assert(umath::to_integral(pragma::scenekit::nodes::vector_math::MathType::Add) == ccl::NodeVectorMathType::NODE_VECTOR_MATH_ADD && umath::to_integral(pragma::scenekit::nodes::vector_math::MathType::Maximum) == ccl::NodeVectorMathType::NODE_VECTOR_MATH_MAXIMUM);
+	static_assert(umath::to_integral(pragma::scenekit::nodes::vector_math::MathType::Count) == 20);
 	// Unreachable
 	return {};
 }
 
-ccl::ustring unirender::cycles::to_ccl_type(unirender::ColorSpace space)
+ccl::ustring pragma::scenekit::cycles::to_ccl_type(pragma::scenekit::ColorSpace space)
 {
 	switch(space) {
-	case unirender::ColorSpace::Raw:
+	case pragma::scenekit::ColorSpace::Raw:
 		return ccl::u_colorspace_raw;
-	case unirender::ColorSpace::Srgb:
+	case pragma::scenekit::ColorSpace::Srgb:
 		return ccl::u_colorspace_srgb;
 	}
-	static_assert(umath::to_integral(unirender::ColorSpace::Count) == 3);
+	static_assert(umath::to_integral(pragma::scenekit::ColorSpace::Count) == 3);
 	// Unreachable
 	return {};
 }
 
-ccl::NodeEnvironmentProjection unirender::cycles::to_ccl_type(unirender::EnvironmentProjection projection)
+ccl::NodeEnvironmentProjection pragma::scenekit::cycles::to_ccl_type(pragma::scenekit::EnvironmentProjection projection)
 {
 	switch(projection) {
-	case unirender::EnvironmentProjection::Equirectangular:
+	case pragma::scenekit::EnvironmentProjection::Equirectangular:
 		return ccl::NodeEnvironmentProjection::NODE_ENVIRONMENT_EQUIRECTANGULAR;
-	case unirender::EnvironmentProjection::MirrorBall:
+	case pragma::scenekit::EnvironmentProjection::MirrorBall:
 		return ccl::NodeEnvironmentProjection::NODE_ENVIRONMENT_MIRROR_BALL;
 	}
-	static_assert(umath::to_integral(unirender::EnvironmentProjection::Equirectangular) == ccl::NodeEnvironmentProjection::NODE_ENVIRONMENT_EQUIRECTANGULAR && umath::to_integral(unirender::EnvironmentProjection::MirrorBall) == ccl::NodeEnvironmentProjection::NODE_ENVIRONMENT_MIRROR_BALL);
-	static_assert(umath::to_integral(unirender::EnvironmentProjection::Count) == 2);
+	static_assert(umath::to_integral(pragma::scenekit::EnvironmentProjection::Equirectangular) == ccl::NodeEnvironmentProjection::NODE_ENVIRONMENT_EQUIRECTANGULAR
+	  && umath::to_integral(pragma::scenekit::EnvironmentProjection::MirrorBall) == ccl::NodeEnvironmentProjection::NODE_ENVIRONMENT_MIRROR_BALL);
+	static_assert(umath::to_integral(pragma::scenekit::EnvironmentProjection::Count) == 2);
 	// Unreachable
 	return {};
 }
 
-ccl::ClosureType unirender::cycles::to_ccl_type(unirender::ClosureType type)
+ccl::ClosureType pragma::scenekit::cycles::to_ccl_type(pragma::scenekit::ClosureType type)
 {
 	switch(type) {
-	case unirender::ClosureType::BsdfMicroFacetMultiGgxGlass:
+	case pragma::scenekit::ClosureType::BsdfMicroFacetMultiGgxGlass:
 		return ccl::ClosureType::CLOSURE_BSDF_MICROFACET_MULTI_GGX_GLASS_ID;
-	case unirender::ClosureType::BsdfDiffuseToon:
+	case pragma::scenekit::ClosureType::BsdfDiffuseToon:
 		return ccl::ClosureType::CLOSURE_BSDF_DIFFUSE_TOON_ID;
-	case unirender::ClosureType::BsdfMicroFacetGgxGlass:
+	case pragma::scenekit::ClosureType::BsdfMicroFacetGgxGlass:
 		return ccl::ClosureType::CLOSURE_BSDF_MICROFACET_GGX_GLASS_ID;
 	}
-	static_assert(umath::to_integral(unirender::EnvironmentProjection::Equirectangular) == ccl::NodeEnvironmentProjection::NODE_ENVIRONMENT_EQUIRECTANGULAR && umath::to_integral(unirender::EnvironmentProjection::MirrorBall) == ccl::NodeEnvironmentProjection::NODE_ENVIRONMENT_MIRROR_BALL);
-	static_assert(umath::to_integral(unirender::ClosureType::Count) == 4);
+	static_assert(umath::to_integral(pragma::scenekit::EnvironmentProjection::Equirectangular) == ccl::NodeEnvironmentProjection::NODE_ENVIRONMENT_EQUIRECTANGULAR
+	  && umath::to_integral(pragma::scenekit::EnvironmentProjection::MirrorBall) == ccl::NodeEnvironmentProjection::NODE_ENVIRONMENT_MIRROR_BALL);
+	static_assert(umath::to_integral(pragma::scenekit::ClosureType::Count) == 4);
 	// Unreachable
 	return {};
 }
 
-ccl::ImageAlphaType unirender::cycles::to_ccl_type(unirender::nodes::image_texture::AlphaType type)
+ccl::ImageAlphaType pragma::scenekit::cycles::to_ccl_type(pragma::scenekit::nodes::image_texture::AlphaType type)
 {
 	switch(type) {
-	case unirender::nodes::image_texture::AlphaType::Unassociated:
+	case pragma::scenekit::nodes::image_texture::AlphaType::Unassociated:
 		return ccl::ImageAlphaType::IMAGE_ALPHA_UNASSOCIATED;
-	case unirender::nodes::image_texture::AlphaType::Associated:
+	case pragma::scenekit::nodes::image_texture::AlphaType::Associated:
 		return ccl::ImageAlphaType::IMAGE_ALPHA_ASSOCIATED;
-	case unirender::nodes::image_texture::AlphaType::ChannelPacked:
+	case pragma::scenekit::nodes::image_texture::AlphaType::ChannelPacked:
 		return ccl::ImageAlphaType::IMAGE_ALPHA_CHANNEL_PACKED;
-	case unirender::nodes::image_texture::AlphaType::Ignore:
+	case pragma::scenekit::nodes::image_texture::AlphaType::Ignore:
 		return ccl::ImageAlphaType::IMAGE_ALPHA_IGNORE;
-	case unirender::nodes::image_texture::AlphaType::Auto:
+	case pragma::scenekit::nodes::image_texture::AlphaType::Auto:
 		return ccl::ImageAlphaType::IMAGE_ALPHA_AUTO;
 	}
-	static_assert(umath::to_integral(unirender::nodes::image_texture::AlphaType::Unassociated) == ccl::ImageAlphaType::IMAGE_ALPHA_UNASSOCIATED && umath::to_integral(unirender::nodes::image_texture::AlphaType::Auto) == ccl::ImageAlphaType::IMAGE_ALPHA_AUTO);
-	static_assert(umath::to_integral(unirender::nodes::image_texture::AlphaType::Count) == 5);
+	static_assert(umath::to_integral(pragma::scenekit::nodes::image_texture::AlphaType::Unassociated) == ccl::ImageAlphaType::IMAGE_ALPHA_UNASSOCIATED && umath::to_integral(pragma::scenekit::nodes::image_texture::AlphaType::Auto) == ccl::ImageAlphaType::IMAGE_ALPHA_AUTO);
+	static_assert(umath::to_integral(pragma::scenekit::nodes::image_texture::AlphaType::Count) == 5);
 	// Unreachable
 	return {};
 }
 
-ccl::InterpolationType unirender::cycles::to_ccl_type(unirender::nodes::image_texture::InterpolationType type)
+ccl::InterpolationType pragma::scenekit::cycles::to_ccl_type(pragma::scenekit::nodes::image_texture::InterpolationType type)
 {
 	switch(type) {
-	case unirender::nodes::image_texture::InterpolationType::Linear:
+	case pragma::scenekit::nodes::image_texture::InterpolationType::Linear:
 		return ccl::InterpolationType::INTERPOLATION_LINEAR;
-	case unirender::nodes::image_texture::InterpolationType::Closest:
+	case pragma::scenekit::nodes::image_texture::InterpolationType::Closest:
 		return ccl::InterpolationType::INTERPOLATION_CLOSEST;
-	case unirender::nodes::image_texture::InterpolationType::Cubic:
+	case pragma::scenekit::nodes::image_texture::InterpolationType::Cubic:
 		return ccl::InterpolationType::INTERPOLATION_CUBIC;
-	case unirender::nodes::image_texture::InterpolationType::Smart:
+	case pragma::scenekit::nodes::image_texture::InterpolationType::Smart:
 		return ccl::InterpolationType::INTERPOLATION_SMART;
 	}
-	static_assert(umath::to_integral(unirender::nodes::image_texture::InterpolationType::Linear) == ccl::InterpolationType::INTERPOLATION_LINEAR && umath::to_integral(unirender::nodes::image_texture::InterpolationType::Smart) == ccl::InterpolationType::INTERPOLATION_SMART);
-	static_assert(umath::to_integral(unirender::nodes::image_texture::InterpolationType::Count) == 4);
+	static_assert(umath::to_integral(pragma::scenekit::nodes::image_texture::InterpolationType::Linear) == ccl::InterpolationType::INTERPOLATION_LINEAR && umath::to_integral(pragma::scenekit::nodes::image_texture::InterpolationType::Smart) == ccl::InterpolationType::INTERPOLATION_SMART);
+	static_assert(umath::to_integral(pragma::scenekit::nodes::image_texture::InterpolationType::Count) == 4);
 	// Unreachable
 	return {};
 }
 
-ccl::ExtensionType unirender::cycles::to_ccl_type(unirender::nodes::image_texture::ExtensionType type)
+ccl::ExtensionType pragma::scenekit::cycles::to_ccl_type(pragma::scenekit::nodes::image_texture::ExtensionType type)
 {
 	switch(type) {
-	case unirender::nodes::image_texture::ExtensionType::Repeat:
+	case pragma::scenekit::nodes::image_texture::ExtensionType::Repeat:
 		return ccl::ExtensionType::EXTENSION_REPEAT;
-	case unirender::nodes::image_texture::ExtensionType::Extend:
+	case pragma::scenekit::nodes::image_texture::ExtensionType::Extend:
 		return ccl::ExtensionType::EXTENSION_EXTEND;
-	case unirender::nodes::image_texture::ExtensionType::Clip:
+	case pragma::scenekit::nodes::image_texture::ExtensionType::Clip:
 		return ccl::ExtensionType::EXTENSION_CLIP;
 	}
-	static_assert(umath::to_integral(unirender::nodes::image_texture::ExtensionType::Repeat) == ccl::ExtensionType::EXTENSION_REPEAT && umath::to_integral(unirender::nodes::image_texture::ExtensionType::Clip) == ccl::ExtensionType::EXTENSION_CLIP);
-	static_assert(umath::to_integral(unirender::nodes::image_texture::ExtensionType::Count) == 3);
+	static_assert(umath::to_integral(pragma::scenekit::nodes::image_texture::ExtensionType::Repeat) == ccl::ExtensionType::EXTENSION_REPEAT && umath::to_integral(pragma::scenekit::nodes::image_texture::ExtensionType::Clip) == ccl::ExtensionType::EXTENSION_CLIP);
+	static_assert(umath::to_integral(pragma::scenekit::nodes::image_texture::ExtensionType::Count) == 3);
 	// Unreachable
 	return {};
 }
 
-ccl::NodeImageProjection unirender::cycles::to_ccl_type(unirender::nodes::image_texture::Projection type)
+ccl::NodeImageProjection pragma::scenekit::cycles::to_ccl_type(pragma::scenekit::nodes::image_texture::Projection type)
 {
 	switch(type) {
-	case unirender::nodes::image_texture::Projection::Flat:
+	case pragma::scenekit::nodes::image_texture::Projection::Flat:
 		return ccl::NodeImageProjection::NODE_IMAGE_PROJ_FLAT;
-	case unirender::nodes::image_texture::Projection::Box:
+	case pragma::scenekit::nodes::image_texture::Projection::Box:
 		return ccl::NodeImageProjection::NODE_IMAGE_PROJ_BOX;
-	case unirender::nodes::image_texture::Projection::Sphere:
+	case pragma::scenekit::nodes::image_texture::Projection::Sphere:
 		return ccl::NodeImageProjection::NODE_IMAGE_PROJ_SPHERE;
-	case unirender::nodes::image_texture::Projection::Tube:
+	case pragma::scenekit::nodes::image_texture::Projection::Tube:
 		return ccl::NodeImageProjection::NODE_IMAGE_PROJ_TUBE;
 	}
-	static_assert(umath::to_integral(unirender::nodes::image_texture::Projection::Flat) == ccl::NodeImageProjection::NODE_IMAGE_PROJ_FLAT && umath::to_integral(unirender::nodes::image_texture::Projection::Tube) == ccl::NodeImageProjection::NODE_IMAGE_PROJ_TUBE);
-	static_assert(umath::to_integral(unirender::nodes::image_texture::Projection::Count) == 4);
+	static_assert(umath::to_integral(pragma::scenekit::nodes::image_texture::Projection::Flat) == ccl::NodeImageProjection::NODE_IMAGE_PROJ_FLAT && umath::to_integral(pragma::scenekit::nodes::image_texture::Projection::Tube) == ccl::NodeImageProjection::NODE_IMAGE_PROJ_TUBE);
+	static_assert(umath::to_integral(pragma::scenekit::nodes::image_texture::Projection::Count) == 4);
 	// Unreachable
 	return {};
 }
 
-ccl::NodeMappingType unirender::cycles::to_ccl_type(unirender::nodes::mapping::Type type)
+ccl::NodeMappingType pragma::scenekit::cycles::to_ccl_type(pragma::scenekit::nodes::mapping::Type type)
 {
 	switch(type) {
-	case unirender::nodes::mapping::Type::Point:
+	case pragma::scenekit::nodes::mapping::Type::Point:
 		return ccl::NodeMappingType::NODE_MAPPING_TYPE_POINT;
-	case unirender::nodes::mapping::Type::Texture:
+	case pragma::scenekit::nodes::mapping::Type::Texture:
 		return ccl::NodeMappingType::NODE_MAPPING_TYPE_TEXTURE;
-	case unirender::nodes::mapping::Type::Vector:
+	case pragma::scenekit::nodes::mapping::Type::Vector:
 		return ccl::NodeMappingType::NODE_MAPPING_TYPE_VECTOR;
-	case unirender::nodes::mapping::Type::Normal:
+	case pragma::scenekit::nodes::mapping::Type::Normal:
 		return ccl::NodeMappingType::NODE_MAPPING_TYPE_NORMAL;
 	}
-	static_assert(umath::to_integral(unirender::nodes::mapping::Type::Point) == ccl::NodeMappingType::NODE_MAPPING_TYPE_POINT && umath::to_integral(unirender::nodes::mapping::Type::Normal) == ccl::NodeMappingType::NODE_MAPPING_TYPE_NORMAL);
-	static_assert(umath::to_integral(unirender::nodes::mapping::Type::Count) == 4);
+	static_assert(umath::to_integral(pragma::scenekit::nodes::mapping::Type::Point) == ccl::NodeMappingType::NODE_MAPPING_TYPE_POINT && umath::to_integral(pragma::scenekit::nodes::mapping::Type::Normal) == ccl::NodeMappingType::NODE_MAPPING_TYPE_NORMAL);
+	static_assert(umath::to_integral(pragma::scenekit::nodes::mapping::Type::Count) == 4);
 	// Unreachable
 	return {};
 }
 
-ccl::NodeNormalMapSpace unirender::cycles::to_ccl_type(unirender::nodes::normal_map::Space space)
+ccl::NodeNormalMapSpace pragma::scenekit::cycles::to_ccl_type(pragma::scenekit::nodes::normal_map::Space space)
 {
 	switch(space) {
-	case unirender::nodes::normal_map::Space::Tangent:
+	case pragma::scenekit::nodes::normal_map::Space::Tangent:
 		return ccl::NodeNormalMapSpace::NODE_NORMAL_MAP_TANGENT;
-	case unirender::nodes::normal_map::Space::Object:
+	case pragma::scenekit::nodes::normal_map::Space::Object:
 		return ccl::NodeNormalMapSpace::NODE_NORMAL_MAP_OBJECT;
-	case unirender::nodes::normal_map::Space::World:
+	case pragma::scenekit::nodes::normal_map::Space::World:
 		return ccl::NodeNormalMapSpace::NODE_NORMAL_MAP_WORLD;
 	}
-	static_assert(umath::to_integral(unirender::nodes::normal_map::Space::Tangent) == ccl::NodeNormalMapSpace::NODE_NORMAL_MAP_TANGENT && umath::to_integral(unirender::nodes::normal_map::Space::World) == ccl::NodeNormalMapSpace::NODE_NORMAL_MAP_WORLD);
-	static_assert(umath::to_integral(unirender::nodes::normal_map::Space::Count) == 3);
+	static_assert(umath::to_integral(pragma::scenekit::nodes::normal_map::Space::Tangent) == ccl::NodeNormalMapSpace::NODE_NORMAL_MAP_TANGENT && umath::to_integral(pragma::scenekit::nodes::normal_map::Space::World) == ccl::NodeNormalMapSpace::NODE_NORMAL_MAP_WORLD);
+	static_assert(umath::to_integral(pragma::scenekit::nodes::normal_map::Space::Count) == 3);
 	// Unreachable
 	return {};
 }
 
-ccl::NodeMix unirender::cycles::to_ccl_type(unirender::nodes::mix::Mix mix)
+ccl::NodeMix pragma::scenekit::cycles::to_ccl_type(pragma::scenekit::nodes::mix::Mix mix)
 {
 	switch(mix) {
-	case unirender::nodes::mix::Mix::Blend:
+	case pragma::scenekit::nodes::mix::Mix::Blend:
 		return ccl::NodeMix::NODE_MIX_BLEND;
-	case unirender::nodes::mix::Mix::Add:
+	case pragma::scenekit::nodes::mix::Mix::Add:
 		return ccl::NodeMix::NODE_MIX_ADD;
-	case unirender::nodes::mix::Mix::Mul:
+	case pragma::scenekit::nodes::mix::Mix::Mul:
 		return ccl::NodeMix::NODE_MIX_MUL;
-	case unirender::nodes::mix::Mix::Sub:
+	case pragma::scenekit::nodes::mix::Mix::Sub:
 		return ccl::NodeMix::NODE_MIX_SUB;
-	case unirender::nodes::mix::Mix::Screen:
+	case pragma::scenekit::nodes::mix::Mix::Screen:
 		return ccl::NodeMix::NODE_MIX_SCREEN;
-	case unirender::nodes::mix::Mix::Div:
+	case pragma::scenekit::nodes::mix::Mix::Div:
 		return ccl::NodeMix::NODE_MIX_DIV;
-	case unirender::nodes::mix::Mix::Diff:
+	case pragma::scenekit::nodes::mix::Mix::Diff:
 		return ccl::NodeMix::NODE_MIX_DIFF;
-	case unirender::nodes::mix::Mix::Dark:
+	case pragma::scenekit::nodes::mix::Mix::Dark:
 		return ccl::NodeMix::NODE_MIX_DARK;
-	case unirender::nodes::mix::Mix::Light:
+	case pragma::scenekit::nodes::mix::Mix::Light:
 		return ccl::NodeMix::NODE_MIX_LIGHT;
-	case unirender::nodes::mix::Mix::Overlay:
+	case pragma::scenekit::nodes::mix::Mix::Overlay:
 		return ccl::NodeMix::NODE_MIX_OVERLAY;
-	case unirender::nodes::mix::Mix::Dodge:
+	case pragma::scenekit::nodes::mix::Mix::Dodge:
 		return ccl::NodeMix::NODE_MIX_DODGE;
-	case unirender::nodes::mix::Mix::Burn:
+	case pragma::scenekit::nodes::mix::Mix::Burn:
 		return ccl::NodeMix::NODE_MIX_BURN;
-	case unirender::nodes::mix::Mix::Hue:
+	case pragma::scenekit::nodes::mix::Mix::Hue:
 		return ccl::NodeMix::NODE_MIX_HUE;
-	case unirender::nodes::mix::Mix::Sat:
+	case pragma::scenekit::nodes::mix::Mix::Sat:
 		return ccl::NodeMix::NODE_MIX_SAT;
-	case unirender::nodes::mix::Mix::Val:
+	case pragma::scenekit::nodes::mix::Mix::Val:
 		return ccl::NodeMix::NODE_MIX_VAL;
-	case unirender::nodes::mix::Mix::Color:
+	case pragma::scenekit::nodes::mix::Mix::Color:
 		return ccl::NodeMix::NODE_MIX_COL;
-	case unirender::nodes::mix::Mix::Soft:
+	case pragma::scenekit::nodes::mix::Mix::Soft:
 		return ccl::NodeMix::NODE_MIX_SOFT;
-	case unirender::nodes::mix::Mix::Linear:
+	case pragma::scenekit::nodes::mix::Mix::Linear:
 		return ccl::NodeMix::NODE_MIX_LINEAR;
-	case unirender::nodes::mix::Mix::Exclusion:
+	case pragma::scenekit::nodes::mix::Mix::Exclusion:
 		return ccl::NodeMix::NODE_MIX_EXCLUSION;
-	case unirender::nodes::mix::Mix::Clamp:
+	case pragma::scenekit::nodes::mix::Mix::Clamp:
 		return ccl::NodeMix::NODE_MIX_CLAMP;
 	}
-	static_assert(umath::to_integral(unirender::nodes::mix::Mix::Blend) == ccl::NodeMix::NODE_MIX_BLEND && umath::to_integral(unirender::nodes::mix::Mix::Clamp) == ccl::NodeMix::NODE_MIX_CLAMP);
-	static_assert(umath::to_integral(unirender::nodes::mix::Mix::Count) == 20);
+	static_assert(umath::to_integral(pragma::scenekit::nodes::mix::Mix::Blend) == ccl::NodeMix::NODE_MIX_BLEND && umath::to_integral(pragma::scenekit::nodes::mix::Mix::Clamp) == ccl::NodeMix::NODE_MIX_CLAMP);
+	static_assert(umath::to_integral(pragma::scenekit::nodes::mix::Mix::Count) == 20);
 	// Unreachable
 	return {};
 }
-ccl::NodeVectorTransformConvertSpace unirender::cycles::to_ccl_type(unirender::nodes::vector_transform::ConvertSpace convertSpace)
+ccl::NodeVectorTransformConvertSpace pragma::scenekit::cycles::to_ccl_type(pragma::scenekit::nodes::vector_transform::ConvertSpace convertSpace)
 {
 	switch(convertSpace) {
-	case unirender::nodes::vector_transform::ConvertSpace::World:
+	case pragma::scenekit::nodes::vector_transform::ConvertSpace::World:
 		return ccl::NodeVectorTransformConvertSpace::NODE_VECTOR_TRANSFORM_CONVERT_SPACE_WORLD;
-	case unirender::nodes::vector_transform::ConvertSpace::Object:
+	case pragma::scenekit::nodes::vector_transform::ConvertSpace::Object:
 		return ccl::NodeVectorTransformConvertSpace::NODE_VECTOR_TRANSFORM_CONVERT_SPACE_OBJECT;
-	case unirender::nodes::vector_transform::ConvertSpace::Camera:
+	case pragma::scenekit::nodes::vector_transform::ConvertSpace::Camera:
 		return ccl::NodeVectorTransformConvertSpace::NODE_VECTOR_TRANSFORM_CONVERT_SPACE_CAMERA;
 	}
-	static_assert(umath::to_integral(unirender::nodes::vector_transform::ConvertSpace::World) == ccl::NodeVectorTransformConvertSpace::NODE_VECTOR_TRANSFORM_CONVERT_SPACE_WORLD
-	  && umath::to_integral(unirender::nodes::vector_transform::ConvertSpace::Camera) == ccl::NodeVectorTransformConvertSpace::NODE_VECTOR_TRANSFORM_CONVERT_SPACE_CAMERA);
-	static_assert(umath::to_integral(unirender::nodes::vector_transform::ConvertSpace::Count) == 3);
+	static_assert(umath::to_integral(pragma::scenekit::nodes::vector_transform::ConvertSpace::World) == ccl::NodeVectorTransformConvertSpace::NODE_VECTOR_TRANSFORM_CONVERT_SPACE_WORLD
+	  && umath::to_integral(pragma::scenekit::nodes::vector_transform::ConvertSpace::Camera) == ccl::NodeVectorTransformConvertSpace::NODE_VECTOR_TRANSFORM_CONVERT_SPACE_CAMERA);
+	static_assert(umath::to_integral(pragma::scenekit::nodes::vector_transform::ConvertSpace::Count) == 3);
 	// Unreachable
 	return {};
 }
-std::shared_ptr<unirender::CCLShader> unirender::CCLShader::Create(cycles::Renderer &renderer, ccl::Shader &cclShader, const GroupNodeDesc &desc, bool useCache)
+std::shared_ptr<pragma::scenekit::CCLShader> pragma::scenekit::CCLShader::Create(cycles::Renderer &renderer, ccl::Shader &cclShader, const GroupNodeDesc &desc, bool useCache)
 {
 	if(useCache) {
 		auto shader = renderer.GetCachedShader(desc);
@@ -409,7 +412,7 @@ std::shared_ptr<unirender::CCLShader> unirender::CCLShader::Create(cycles::Rende
 		renderer.AddShader(*pShader, &desc);
 	return pShader;
 }
-std::shared_ptr<unirender::CCLShader> unirender::CCLShader::Create(cycles::Renderer &renderer, const GroupNodeDesc &desc)
+std::shared_ptr<pragma::scenekit::CCLShader> pragma::scenekit::CCLShader::Create(cycles::Renderer &renderer, const GroupNodeDesc &desc)
 {
 	auto shader = renderer.GetCachedShader(desc);
 	if(shader)
@@ -440,9 +443,9 @@ std::shared_ptr<unirender::CCLShader> unirender::CCLShader::Create(cycles::Rende
 	return shader;
 }
 
-unirender::CCLShader::CCLShader(cycles::Renderer &renderer, ccl::Shader &cclShader, ccl::ShaderGraph &cclShaderGraph) : m_renderer {renderer}, m_cclShader {cclShader}, m_cclGraph {cclShaderGraph} {}
+pragma::scenekit::CCLShader::CCLShader(cycles::Renderer &renderer, ccl::Shader &cclShader, ccl::ShaderGraph &cclShaderGraph) : m_renderer {renderer}, m_cclShader {cclShader}, m_cclGraph {cclShaderGraph} {}
 
-unirender::CCLShader::~CCLShader()
+pragma::scenekit::CCLShader::~CCLShader()
 {
 	if(umath::is_flag_set(m_flags, Flags::CCLShaderGraphOwnedByScene) == false)
 		delete &m_cclGraph;
@@ -450,10 +453,10 @@ unirender::CCLShader::~CCLShader()
 		delete &m_cclShader;
 }
 
-ccl::Shader *unirender::CCLShader::operator->() { return &m_cclShader; }
-ccl::Shader *unirender::CCLShader::operator*() { return &m_cclShader; }
+ccl::Shader *pragma::scenekit::CCLShader::operator->() { return &m_cclShader; }
+ccl::Shader *pragma::scenekit::CCLShader::operator*() { return &m_cclShader; }
 
-void unirender::CCLShader::DoFinalize(Scene &scene)
+void pragma::scenekit::CCLShader::DoFinalize(Scene &scene)
 {
 	BaseObject::DoFinalize(scene);
 	m_flags |= Flags::CCLShaderGraphOwnedByScene | Flags::CCLShaderOwnedByScene;
@@ -461,31 +464,31 @@ void unirender::CCLShader::DoFinalize(Scene &scene)
 	m_cclShader.tag_update(m_renderer.GetCclScene());
 }
 
-std::unique_ptr<unirender::CCLShader::BaseNodeWrapper> unirender::CCLShader::ResolveCustomNode(const std::string &typeName)
+std::unique_ptr<pragma::scenekit::CCLShader::BaseNodeWrapper> pragma::scenekit::CCLShader::ResolveCustomNode(const std::string &typeName)
 {
-	if(typeName == unirender::NODE_NORMAL_TEXTURE) {
+	if(typeName == pragma::scenekit::NODE_NORMAL_TEXTURE) {
 		struct NormalNodeWrapper : public BaseNodeWrapper {
 			virtual ccl::ShaderInput *FindInput(const std::string &name, ccl::ShaderNode **outNode) override
 			{
-				if(name == unirender::nodes::normal_texture::IN_STRENGTH) {
+				if(name == pragma::scenekit::nodes::normal_texture::IN_STRENGTH) {
 					*outNode = normalMapNode;
-					return unirender::CCLShader::FindInput(*normalMapNode, unirender::nodes::normal_map::IN_STRENGTH);
+					return pragma::scenekit::CCLShader::FindInput(*normalMapNode, pragma::scenekit::nodes::normal_map::IN_STRENGTH);
 				}
 				return nullptr;
 			}
 			virtual ccl::ShaderOutput *FindOutput(const std::string &name, ccl::ShaderNode **outNode) override
 			{
-				if(name == unirender::nodes::normal_texture::OUT_NORMAL) {
+				if(name == pragma::scenekit::nodes::normal_texture::OUT_NORMAL) {
 					*outNode = normalMapNode;
-					return unirender::CCLShader::FindOutput(*normalMapNode, unirender::nodes::normal_map::OUT_NORMAL);
+					return pragma::scenekit::CCLShader::FindOutput(*normalMapNode, pragma::scenekit::nodes::normal_map::OUT_NORMAL);
 				}
 				return nullptr;
 			}
 			virtual const ccl::SocketType *FindProperty(const std::string &name, ccl::ShaderNode **outNode) override
 			{
-				if(name == unirender::nodes::normal_texture::IN_FILENAME) {
+				if(name == pragma::scenekit::nodes::normal_texture::IN_FILENAME) {
 					*outNode = imageTexNode;
-					return imageTexNode->type->find_input(ccl::ustring {unirender::nodes::image_texture::IN_FILENAME});
+					return imageTexNode->type->find_input(ccl::ustring {pragma::scenekit::nodes::image_texture::IN_FILENAME});
 				}
 				return nullptr;
 			}
@@ -494,31 +497,31 @@ std::unique_ptr<unirender::CCLShader::BaseNodeWrapper> unirender::CCLShader::Res
 			ccl::NormalMapNode *normalMapNode = nullptr;
 		};
 		auto wrapper = std::make_unique<NormalNodeWrapper>();
-		wrapper->imageTexNode = static_cast<ccl::ImageTextureNode *>(AddNode(unirender::NODE_IMAGE_TEXTURE));
+		wrapper->imageTexNode = static_cast<ccl::ImageTextureNode *>(AddNode(pragma::scenekit::NODE_IMAGE_TEXTURE));
 		assert(wrapper->imageTexNode);
 		wrapper->imageTexNode->set_colorspace(ccl::u_colorspace_raw);
 		wrapper->imageTexNode->set_alpha_type(ccl::ImageAlphaType::IMAGE_ALPHA_IGNORE);
 
-		auto *sep = static_cast<ccl::SeparateRGBNode *>(AddNode(unirender::NODE_SEPARATE_RGB));
-		m_cclGraph.connect(FindOutput(*wrapper->imageTexNode, unirender::nodes::image_texture::OUT_COLOR), FindInput(*sep, unirender::nodes::separate_rgb::IN_COLOR));
+		auto *sep = static_cast<ccl::SeparateRGBNode *>(AddNode(pragma::scenekit::NODE_SEPARATE_RGB));
+		m_cclGraph.connect(FindOutput(*wrapper->imageTexNode, pragma::scenekit::nodes::image_texture::OUT_COLOR), FindInput(*sep, pragma::scenekit::nodes::separate_rgb::IN_COLOR));
 
-		auto *cmb = static_cast<ccl::CombineRGBNode *>(AddNode(unirender::NODE_COMBINE_RGB));
-		m_cclGraph.connect(FindOutput(*sep, unirender::nodes::separate_rgb::OUT_R), FindInput(*cmb, unirender::nodes::combine_rgb::IN_G));
-		m_cclGraph.connect(FindOutput(*sep, unirender::nodes::separate_rgb::OUT_G), FindInput(*cmb, unirender::nodes::combine_rgb::IN_R));
-		m_cclGraph.connect(FindOutput(*sep, unirender::nodes::separate_rgb::OUT_B), FindInput(*cmb, unirender::nodes::combine_rgb::IN_B));
+		auto *cmb = static_cast<ccl::CombineRGBNode *>(AddNode(pragma::scenekit::NODE_COMBINE_RGB));
+		m_cclGraph.connect(FindOutput(*sep, pragma::scenekit::nodes::separate_rgb::OUT_R), FindInput(*cmb, pragma::scenekit::nodes::combine_rgb::IN_G));
+		m_cclGraph.connect(FindOutput(*sep, pragma::scenekit::nodes::separate_rgb::OUT_G), FindInput(*cmb, pragma::scenekit::nodes::combine_rgb::IN_R));
+		m_cclGraph.connect(FindOutput(*sep, pragma::scenekit::nodes::separate_rgb::OUT_B), FindInput(*cmb, pragma::scenekit::nodes::combine_rgb::IN_B));
 
-		wrapper->normalMapNode = static_cast<ccl::NormalMapNode *>(AddNode(unirender::NODE_NORMAL_MAP));
+		wrapper->normalMapNode = static_cast<ccl::NormalMapNode *>(AddNode(pragma::scenekit::NODE_NORMAL_MAP));
 		assert(wrapper->normalMapNode);
 		wrapper->normalMapNode->set_space(ccl::NodeNormalMapSpace::NODE_NORMAL_MAP_TANGENT);
 
-		auto *normIn = FindInput(*wrapper->normalMapNode, unirender::nodes::normal_map::IN_COLOR);
-		m_cclGraph.connect(FindOutput(*cmb, unirender::nodes::combine_rgb::OUT_IMAGE), normIn);
+		auto *normIn = FindInput(*wrapper->normalMapNode, pragma::scenekit::nodes::normal_map::IN_COLOR);
+		m_cclGraph.connect(FindOutput(*cmb, pragma::scenekit::nodes::combine_rgb::OUT_IMAGE), normIn);
 		return wrapper;
 	}
 	return nullptr;
 }
 
-ccl::ShaderNode *unirender::CCLShader::AddNode(const std::string &typeName)
+ccl::ShaderNode *pragma::scenekit::CCLShader::AddNode(const std::string &typeName)
 {
 	auto *nodeType = ccl::NodeType::find(ccl::ustring {typeName});
 	auto *snode = nodeType ? static_cast<ccl::ShaderNode *>(nodeType->create(nodeType)) : nullptr;
@@ -532,7 +535,7 @@ ccl::ShaderNode *unirender::CCLShader::AddNode(const std::string &typeName)
 	return snode;
 }
 
-void unirender::CCLShader::InitializeNode(const NodeDesc &desc, std::unordered_map<const NodeDesc *, ccl::ShaderNode *> &nodeToCclNode, const GroupSocketTranslationTable &groupIoSockets)
+void pragma::scenekit::CCLShader::InitializeNode(const NodeDesc &desc, std::unordered_map<const NodeDesc *, ccl::ShaderNode *> &nodeToCclNode, const GroupSocketTranslationTable &groupIoSockets)
 {
 	if(desc.IsGroupNode()) {
 		auto &groupDesc = *static_cast<const GroupNodeDesc *>(&desc);
@@ -598,16 +601,16 @@ void unirender::CCLShader::InitializeNode(const NodeDesc &desc, std::unordered_m
 		nodeToCclNode[&desc] = m_cclGraph.output();
 		return;
 	}
-	struct CclNodeWrapper : public unirender::CCLShader::BaseNodeWrapper {
+	struct CclNodeWrapper : public pragma::scenekit::CCLShader::BaseNodeWrapper {
 		virtual ccl::ShaderInput *FindInput(const std::string &name, ccl::ShaderNode **outNode) override
 		{
 			*outNode = node;
-			return unirender::CCLShader::FindInput(*node, name);
+			return pragma::scenekit::CCLShader::FindInput(*node, name);
 		}
 		virtual ccl::ShaderOutput *FindOutput(const std::string &name, ccl::ShaderNode **outNode) override
 		{
 			*outNode = node;
-			return unirender::CCLShader::FindOutput(*node, name);
+			return pragma::scenekit::CCLShader::FindOutput(*node, name);
 		}
 		virtual const ccl::SocketType *FindProperty(const std::string &name, ccl::ShaderNode **outNode) override
 		{
@@ -619,7 +622,7 @@ void unirender::CCLShader::InitializeNode(const NodeDesc &desc, std::unordered_m
 	};
 
 	auto *snode = AddNode(typeName);
-	std::unique_ptr<unirender::CCLShader::BaseNodeWrapper> wrapper = nullptr;
+	std::unique_ptr<pragma::scenekit::CCLShader::BaseNodeWrapper> wrapper = nullptr;
 	auto isCclNode = false;
 	if(snode != nullptr) {
 		wrapper = std::make_unique<CclNodeWrapper>();
@@ -673,79 +676,79 @@ static ccl::array<TDst> to_ccl_array(const std::vector<TSrc> &input, const std::
 	return output;
 }
 
-std::string unirender::CCLShader::TranslateInputName(const ccl::ShaderNode &node, const std::string &inputName)
+std::string pragma::scenekit::CCLShader::TranslateInputName(const ccl::ShaderNode &node, const std::string &inputName)
 {
 	// Some Cycles node socket names don't match ours (due to Cycles updates or other reasons), so we'll have to translate them here
 	if(typeid(node) == typeid(ccl::MathNode)) {
-		if(ustring::compare(inputName.c_str(), unirender::nodes::math::IN_TYPE, false))
+		if(ustring::compare(inputName.c_str(), pragma::scenekit::nodes::math::IN_TYPE, false))
 			return "math_type";
 	}
 	else if(typeid(node) == typeid(ccl::MappingNode)) {
-		if(ustring::compare(inputName.c_str(), unirender::nodes::mapping::IN_TYPE, false))
+		if(ustring::compare(inputName.c_str(), pragma::scenekit::nodes::mapping::IN_TYPE, false))
 			return "mapping_type";
 	}
 	else if(typeid(node) == typeid(ccl::MixNode)) {
-		if(ustring::compare(inputName.c_str(), unirender::nodes::mix::IN_TYPE, false))
+		if(ustring::compare(inputName.c_str(), pragma::scenekit::nodes::mix::IN_TYPE, false))
 			return "mix_type";
 	}
 	else if(typeid(node) == typeid(ccl::VectorMathNode)) {
-		if(ustring::compare(inputName.c_str(), unirender::nodes::vector_math::IN_TYPE, false))
+		if(ustring::compare(inputName.c_str(), pragma::scenekit::nodes::vector_math::IN_TYPE, false))
 			return "math_type";
 	}
 	else if(typeid(node) == typeid(ccl::VectorTransformNode)) {
-		if(ustring::compare(inputName.c_str(), unirender::nodes::vector_transform::IN_TYPE, false))
+		if(ustring::compare(inputName.c_str(), pragma::scenekit::nodes::vector_transform::IN_TYPE, false))
 			return "transform_type";
 	}
 	return inputName;
 }
 
 template<typename TCcl, typename TEnum>
-static bool apply_translated_socket_value(const ccl::ShaderNode &shaderNode, const std::string &socketName, const std::string &targetSocketName, const unirender::NodeSocketDesc &sockDesc, ccl::Node &node, const ccl::SocketType &sockType)
+static bool apply_translated_socket_value(const ccl::ShaderNode &shaderNode, const std::string &socketName, const std::string &targetSocketName, const pragma::scenekit::NodeSocketDesc &sockDesc, ccl::Node &node, const ccl::SocketType &sockType)
 {
 	if(typeid(shaderNode) != typeid(TCcl))
 		return false;
 	if(!ustring::compare(socketName.c_str(), targetSocketName.c_str(), false))
 		return false;
-	if(sockDesc.dataValue.type != unirender::SocketType::Enum)
+	if(sockDesc.dataValue.type != pragma::scenekit::SocketType::Enum)
 		return false;
-	auto val = *static_cast<unirender::STEnum *>(sockDesc.dataValue.value.get());
-	val = unirender::cycles::to_ccl_enum<TEnum>(val);
+	auto val = *static_cast<pragma::scenekit::STEnum *>(sockDesc.dataValue.value.get());
+	val = pragma::scenekit::cycles::to_ccl_enum<TEnum>(val);
 	node.set(sockType, val);
 	return true;
 }
 
-void unirender::CCLShader::ApplySocketValue(const ccl::ShaderNode &shaderNode, const std::string &socketName, const NodeSocketDesc &sockDesc, ccl::Node &node, const ccl::SocketType &sockType)
+void pragma::scenekit::CCLShader::ApplySocketValue(const ccl::ShaderNode &shaderNode, const std::string &socketName, const NodeSocketDesc &sockDesc, ccl::Node &node, const ccl::SocketType &sockType)
 {
 	if(sockDesc.dataValue.type == SocketType::Closure)
 		return;
-	if(apply_translated_socket_value<ccl::MathNode, unirender::nodes::math::MathType>(shaderNode, socketName, "math_type", sockDesc, node, sockType))
+	if(apply_translated_socket_value<ccl::MathNode, pragma::scenekit::nodes::math::MathType>(shaderNode, socketName, "math_type", sockDesc, node, sockType))
 		return;
-	if(apply_translated_socket_value<ccl::MappingNode, unirender::nodes::mapping::Type>(shaderNode, socketName, "mapping_type", sockDesc, node, sockType))
+	if(apply_translated_socket_value<ccl::MappingNode, pragma::scenekit::nodes::mapping::Type>(shaderNode, socketName, "mapping_type", sockDesc, node, sockType))
 		return;
-	if(apply_translated_socket_value<ccl::MixNode, unirender::nodes::mix::Mix>(shaderNode, socketName, "mix_type", sockDesc, node, sockType))
+	if(apply_translated_socket_value<ccl::MixNode, pragma::scenekit::nodes::mix::Mix>(shaderNode, socketName, "mix_type", sockDesc, node, sockType))
 		return;
-	if(apply_translated_socket_value<ccl::VectorMathNode, unirender::nodes::vector_math::MathType>(shaderNode, socketName, "math_type", sockDesc, node, sockType))
+	if(apply_translated_socket_value<ccl::VectorMathNode, pragma::scenekit::nodes::vector_math::MathType>(shaderNode, socketName, "math_type", sockDesc, node, sockType))
 		return;
-	if(apply_translated_socket_value<ccl::VectorTransformNode, unirender::nodes::vector_transform::Type>(shaderNode, socketName, "transform_type", sockDesc, node, sockType))
+	if(apply_translated_socket_value<ccl::VectorTransformNode, pragma::scenekit::nodes::vector_transform::Type>(shaderNode, socketName, "transform_type", sockDesc, node, sockType))
 		return;
 
-	if(apply_translated_socket_value<ccl::ImageTextureNode, unirender::nodes::image_texture::InterpolationType>(shaderNode, socketName, "interpolation", sockDesc, node, sockType))
+	if(apply_translated_socket_value<ccl::ImageTextureNode, pragma::scenekit::nodes::image_texture::InterpolationType>(shaderNode, socketName, "interpolation", sockDesc, node, sockType))
 		return;
-	if(apply_translated_socket_value<ccl::ImageTextureNode, unirender::nodes::image_texture::ExtensionType>(shaderNode, socketName, "extension", sockDesc, node, sockType))
+	if(apply_translated_socket_value<ccl::ImageTextureNode, pragma::scenekit::nodes::image_texture::ExtensionType>(shaderNode, socketName, "extension", sockDesc, node, sockType))
 		return;
-	if(apply_translated_socket_value<ccl::ImageTextureNode, unirender::nodes::image_texture::Projection>(shaderNode, socketName, "projection", sockDesc, node, sockType))
+	if(apply_translated_socket_value<ccl::ImageTextureNode, pragma::scenekit::nodes::image_texture::Projection>(shaderNode, socketName, "projection", sockDesc, node, sockType))
 		return;
-	if(apply_translated_socket_value<ccl::ImageTextureNode, unirender::nodes::image_texture::AlphaType>(shaderNode, socketName, "alpha_type", sockDesc, node, sockType))
+	if(apply_translated_socket_value<ccl::ImageTextureNode, pragma::scenekit::nodes::image_texture::AlphaType>(shaderNode, socketName, "alpha_type", sockDesc, node, sockType))
 		return;
-	if(apply_translated_socket_value<ccl::VectorTransformNode, unirender::nodes::vector_transform::ConvertSpace>(shaderNode, socketName, "convert_from", sockDesc, node, sockType))
+	if(apply_translated_socket_value<ccl::VectorTransformNode, pragma::scenekit::nodes::vector_transform::ConvertSpace>(shaderNode, socketName, "convert_from", sockDesc, node, sockType))
 		return;
-	if(apply_translated_socket_value<ccl::VectorTransformNode, unirender::nodes::vector_transform::ConvertSpace>(shaderNode, socketName, "convert_to", sockDesc, node, sockType))
+	if(apply_translated_socket_value<ccl::VectorTransformNode, pragma::scenekit::nodes::vector_transform::ConvertSpace>(shaderNode, socketName, "convert_to", sockDesc, node, sockType))
 		return;
-	if(apply_translated_socket_value<ccl::NormalMapNode, unirender::nodes::normal_map::Space>(shaderNode, socketName, "space", sockDesc, node, sockType))
+	if(apply_translated_socket_value<ccl::NormalMapNode, pragma::scenekit::nodes::normal_map::Space>(shaderNode, socketName, "space", sockDesc, node, sockType))
 		return;
 
 	if(!sockDesc.dataValue.value) {
-		auto &logger = unirender::get_logger();
+		auto &logger = pragma::scenekit::get_logger();
 		if(logger)
 			logger->error("Socket '{}' of shader node '{}' has invalid value!", socketName, shaderNode.name.string());
 		return;
@@ -823,7 +826,7 @@ void unirender::CCLShader::ApplySocketValue(const ccl::ShaderNode &shaderNode, c
 	static_assert(umath::to_integral(SocketType::Count) == 16);
 }
 
-void unirender::CCLShader::ConvertGroupSocketsToNodes(const GroupNodeDesc &groupDesc, GroupSocketTranslationTable &outGroupIoSockets)
+void pragma::scenekit::CCLShader::ConvertGroupSocketsToNodes(const GroupNodeDesc &groupDesc, GroupSocketTranslationTable &outGroupIoSockets)
 {
 	// Note: Group nodes don't exist in Cycles, they're implicit and replaced by their contents.
 	// To do so, we convert the input and output sockets to constant nodes and re-direct all links
@@ -863,7 +866,7 @@ void unirender::CCLShader::ConvertGroupSocketsToNodes(const GroupNodeDesc &group
 				socketTranslation.input = {nodeVec, nodes::vector_math::IN_VECTOR1};
 				socketTranslation.output = {nodeVec, nodes::vector_math::OUT_VECTOR};
 			}
-			else if(socketDesc.dataValue.type == unirender::SocketType::Closure) {
+			else if(socketDesc.dataValue.type == pragma::scenekit::SocketType::Closure) {
 				auto *mix = static_cast<ccl::MixClosureNode *>(AddNode(NODE_MIX_CLOSURE));
 				assert(mix);
 				mix->set_fac(0.f);
@@ -889,7 +892,7 @@ void unirender::CCLShader::ConvertGroupSocketsToNodes(const GroupNodeDesc &group
 	}
 }
 
-void unirender::CCLShader::InitializeNodeGraph(const GroupNodeDesc &desc)
+void pragma::scenekit::CCLShader::InitializeNodeGraph(const GroupNodeDesc &desc)
 {
 	GroupSocketTranslationTable groupIoSockets;
 	ConvertGroupSocketsToNodes(desc, groupIoSockets);
@@ -898,24 +901,24 @@ void unirender::CCLShader::InitializeNodeGraph(const GroupNodeDesc &desc)
 	InitializeNode(desc, nodeToCclNode, groupIoSockets);
 }
 
-const ccl::SocketType *unirender::CCLShader::FindProperty(ccl::ShaderNode &node, const std::string &inputName)
+const ccl::SocketType *pragma::scenekit::CCLShader::FindProperty(ccl::ShaderNode &node, const std::string &inputName)
 {
 	auto translatedInputName = TranslateInputName(node, inputName);
 	auto it = std::find_if(node.type->inputs.begin(), node.type->inputs.end(), [&translatedInputName](const ccl::SocketType &socketType) { return ccl::string_iequals(socketType.name.string(), translatedInputName); });
 	return (it != node.type->inputs.end()) ? &*it : nullptr;
 }
-ccl::ShaderInput *unirender::CCLShader::FindInput(ccl::ShaderNode &node, const std::string &inputName)
+ccl::ShaderInput *pragma::scenekit::CCLShader::FindInput(ccl::ShaderNode &node, const std::string &inputName)
 {
 	// return node.input(ccl::ustring{inputName}); // Doesn't work in some cases for some reason
 	auto translatedInputName = TranslateInputName(node, inputName);
 	auto it = std::find_if(node.inputs.begin(), node.inputs.end(), [&translatedInputName](const ccl::ShaderInput *shInput) { return ccl::string_iequals(shInput->socket_type.name.string(), translatedInputName); });
 	return (it != node.inputs.end()) ? *it : nullptr;
 }
-ccl::ShaderOutput *unirender::CCLShader::FindOutput(ccl::ShaderNode &node, const std::string &outputName)
+ccl::ShaderOutput *pragma::scenekit::CCLShader::FindOutput(ccl::ShaderNode &node, const std::string &outputName)
 {
 	// return node.output(ccl::ustring{outputName}); // Doesn't work in some cases for some reason
 	auto it = std::find_if(node.outputs.begin(), node.outputs.end(), [&outputName](const ccl::ShaderOutput *shOutput) { return ccl::string_iequals(shOutput->socket_type.name.string(), outputName); });
 	return (it != node.outputs.end()) ? *it : nullptr;
 }
 
-std::string unirender::CCLShader::GetCurrentInternalNodeName() const { return "internal_" + std::to_string(m_cclGraph.nodes.size()); }
+std::string pragma::scenekit::CCLShader::GetCurrentInternalNodeName() const { return "internal_" + std::to_string(m_cclGraph.nodes.size()); }

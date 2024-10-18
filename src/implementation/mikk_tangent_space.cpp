@@ -16,10 +16,11 @@
 
 // Source: blender/intern/cycles/blender/blender_mesh.cpp
 
-#include "util_raytracing/mesh.hpp"
-#include "unirender/cycles/renderer.hpp"
 #include <scene/mesh.h>
 #include <mikktspace.h>
+
+import pragma.scenekit.cycles;
+import pragma.scenekit;
 
 struct MikkUserData {
   MikkUserData(
@@ -199,7 +200,7 @@ static void mikk_set_tangent_space(const SMikkTSpaceContext *context,
   }
 }
 
-void unirender::cycles::compute_tangents(
+void pragma::scenekit::cycles::compute_tangents(
     ccl::Mesh *mesh, bool need_sign, bool active_render)
 {
     const char *layer_name = nullptr;

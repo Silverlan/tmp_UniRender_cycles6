@@ -5,10 +5,8 @@
 * Copyright (c) 2023 Silverlan
 */
 
-#ifndef __CCL_SHADER_HPP__
-#define __CCL_SHADER_HPP__
+module;
 
-#include <util_raytracing/shader.hpp>
 #include <scene/shader_nodes.h>
 #include <sharedutils/datastream.h>
 #include <sharedutils/util_virtual_shared_from_this.hpp>
@@ -24,25 +22,30 @@ namespace ccl {
 	class ShaderOutput;
 };
 
-namespace unirender {
+export module pragma.scenekit.cycles:ccl_shader;
+
+import pragma.scenekit;
+
+export namespace pragma::scenekit
+{
 	namespace cycles {
 		class Renderer;
-		ccl::NodeMathType to_ccl_type(unirender::nodes::math::MathType type);
-		ccl::NodeVectorMathType to_ccl_type(unirender::nodes::vector_math::MathType type);
-		ccl::NodeVectorTransformType to_ccl_type(unirender::nodes::vector_transform::Type type);
-		ccl::ustring to_ccl_type(unirender::ColorSpace space);
-		ccl::NodeEnvironmentProjection to_ccl_type(unirender::EnvironmentProjection projection);
-		ccl::ClosureType to_ccl_type(unirender::ClosureType type);
-		ccl::ImageAlphaType to_ccl_type(unirender::nodes::image_texture::AlphaType type);
-		ccl::InterpolationType to_ccl_type(unirender::nodes::image_texture::InterpolationType type);
-		ccl::ExtensionType to_ccl_type(unirender::nodes::image_texture::ExtensionType type);
-		ccl::NodeImageProjection to_ccl_type(unirender::nodes::image_texture::Projection type);
-		ccl::NodeMappingType to_ccl_type(unirender::nodes::mapping::Type type);
-		ccl::NodeNormalMapSpace to_ccl_type(unirender::nodes::normal_map::Space space);
-		ccl::NodeMix to_ccl_type(unirender::nodes::mix::Mix mix);
-		ccl::NodeVectorTransformConvertSpace to_ccl_type(unirender::nodes::vector_transform::ConvertSpace convertSpace);
+		ccl::NodeMathType to_ccl_type(pragma::scenekit::nodes::math::MathType type);
+		ccl::NodeVectorMathType to_ccl_type(pragma::scenekit::nodes::vector_math::MathType type);
+		ccl::NodeVectorTransformType to_ccl_type(pragma::scenekit::nodes::vector_transform::Type type);
+		ccl::ustring to_ccl_type(pragma::scenekit::ColorSpace space);
+		ccl::NodeEnvironmentProjection to_ccl_type(pragma::scenekit::EnvironmentProjection projection);
+		ccl::ClosureType to_ccl_type(pragma::scenekit::ClosureType type);
+		ccl::ImageAlphaType to_ccl_type(pragma::scenekit::nodes::image_texture::AlphaType type);
+		ccl::InterpolationType to_ccl_type(pragma::scenekit::nodes::image_texture::InterpolationType type);
+		ccl::ExtensionType to_ccl_type(pragma::scenekit::nodes::image_texture::ExtensionType type);
+		ccl::NodeImageProjection to_ccl_type(pragma::scenekit::nodes::image_texture::Projection type);
+		ccl::NodeMappingType to_ccl_type(pragma::scenekit::nodes::mapping::Type type);
+		ccl::NodeNormalMapSpace to_ccl_type(pragma::scenekit::nodes::normal_map::Space space);
+		ccl::NodeMix to_ccl_type(pragma::scenekit::nodes::mix::Mix mix);
+		ccl::NodeVectorTransformConvertSpace to_ccl_type(pragma::scenekit::nodes::vector_transform::ConvertSpace convertSpace);
 		template<typename T>
-		unirender::STEnum to_ccl_enum(unirender::STEnum uniEnum)
+		pragma::scenekit::STEnum to_ccl_enum(pragma::scenekit::STEnum uniEnum)
 		{
 			return static_cast<STEnum>(to_ccl_type(static_cast<T>(uniEnum)));
 		}
@@ -97,6 +100,4 @@ namespace unirender {
 		cycles::Renderer &m_renderer;
 	};
 };
-REGISTER_BASIC_BITWISE_OPERATORS(unirender::CCLShader::Flags)
-
-#endif
+REGISTER_BASIC_BITWISE_OPERATORS(pragma::scenekit::CCLShader::Flags)

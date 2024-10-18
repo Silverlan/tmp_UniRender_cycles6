@@ -13,8 +13,7 @@ pr_add_library(${PROJ_NAME} SHARED)
 pr_add_dependency(${PROJ_NAME} util_raytracing TARGET PUBLIC)
 pr_add_dependency(${PROJ_NAME} spdlog TARGET PUBLIC)
 
-pr_add_headers(${PROJ_NAME} "include/")
-pr_add_sources(${PROJ_NAME} "src/")
+pr_init_module(${PROJ_NAME})
 
 pr_add_external_dependency(${PROJ_NAME} cycles INCLUDE)
 pr_add_external_dependency(${PROJ_NAME} cycles_atomic INCLUDE)

@@ -5,16 +5,61 @@
 * Copyright (c) 2021 Silverlan
 */
 
-#ifndef __UNIRENDER_CYCLES_SCENE_HPP__
-#define __UNIRENDER_CYCLES_SCENE_HPP__
+module;
 
-#include <util_raytracing/object.hpp>
-#include <util_raytracing/renderer.hpp>
-#include <util_raytracing/scene.hpp>
+namespace uimg {
+	class ImageBuffer;
+	struct ImageLayerSet;
+};
+namespace util::ocio {
+	class ColorProcessor;
+};
+namespace oidn {
+	class DeviceRef;
+};
+
+namespace ccl {
+	class Session;
+	class Scene;
+	class ShaderInput;
+	class ShaderNode;
+	class ShaderOutput;
+	class ShaderGraph;
+	struct float3;
+	struct float2;
+	struct Transform;
+	class ImageTextureNode;
+	class EnvironmentTextureNode;
+	class BufferParams;
+	class SessionParams;
+};
+namespace udm {
+	struct Property;
+};
+namespace OpenImageIO_v2_1 {
+	class ustring;
+};
+namespace umath {
+	class Transform;
+	class ScaledTransform;
+};
+namespace spdlog {
+	class logger;
+};
+namespace OpenSubdiv::v3_6_0::Far {
+	class PrimvarRefiner;
+};
+class DataStream;
+
 #include <sharedutils/util_baking.hpp>
+#include <sharedutils/util.h>
+#include <mathutil/uvec.h>
+#include <mathutil/transform.hpp>
 #include <session/session.h>
 #include <cinttypes>
 #include <atomic>
+
+import pragma.scenekit;
 
 namespace unirender {
 	class Scene;
@@ -22,13 +67,17 @@ namespace unirender {
 		class Renderer;
 	};
 };
-namespace unirender::cycles {
+
+export module pragma.scenekit.cycles:renderer;
+
+export namespace pragma::scenekit::cycles
+{
 	void compute_tangents(ccl::Mesh *mesh, bool need_sign, bool active_render);
 	class DisplayDriver;
 	class OutputDriver;
-	class Renderer : public unirender::Renderer {
+	class Renderer : public pragma::scenekit::Renderer {
 	  public:
-		static std::shared_ptr<Renderer> Create(const unirender::Scene &scene, std::string &outErr, Flags flags);
+		static std::shared_ptr<Renderer> Create(const pragma::scenekit::Scene &scene, std::string &outErr, Flags flags);
 		static constexpr ccl::AttributeStandard ALPHA_ATTRIBUTE_TYPE = ccl::AttributeStandard::ATTR_STD_POINTINESS;
 
 		enum class StateFlags : uint32_t {
@@ -68,7 +117,7 @@ namespace unirender::cycles {
 		virtual bool BeginSceneEdit() override;
 		virtual bool EndSceneEdit() override;
 		virtual bool SyncEditedActor(const util::Uuid &uuid) override;
-		virtual bool AddLiveActor(unirender::WorldObject &actor) override;
+		virtual bool AddLiveActor(pragma::scenekit::WorldObject &actor) override;
 
 		ccl::Object *FindCclObject(const Object &obj);
 		const ccl::Object *FindCclObject(const Object &obj) const { return const_cast<Renderer *>(this)->FindCclObject(obj); }
@@ -109,23 +158,23 @@ namespace unirender::cycles {
 		bool InitializeBakingData();
 		void FinalizeAndCloseCyclesScene();
 		void CloseCyclesScene();
-		void ApplyPostProcessing(uimg::ImageBuffer &imgBuffer, unirender::Scene::RenderMode renderMode);
+		void ApplyPostProcessing(uimg::ImageBuffer &imgBuffer, pragma::scenekit::Scene::RenderMode renderMode);
 		void InitializeAlbedoPass(bool reloadShaders);
 		void InitializeNormalPass(bool reloadShaders);
 		void InitializePassShaders(const std::function<std::shared_ptr<GroupNodeDesc>(const Shader &)> &fGetPassDesc);
 		void AddSkybox(const std::string &texture);
-		virtual util::EventReply HandleRenderStage(RenderWorker &worker, unirender::Renderer::ImageRenderStage stage, StereoEye eyeStage, unirender::Renderer::RenderStageResult *optResult = nullptr) override;
-		void WaitForRenderStage(RenderWorker &worker, float baseProgress, float progressMultiplier, const std::function<unirender::Renderer::RenderStageResult()> &fOnComplete);
+		virtual util::EventReply HandleRenderStage(RenderWorker &worker, pragma::scenekit::Renderer::ImageRenderStage stage, StereoEye eyeStage, pragma::scenekit::Renderer::RenderStageResult *optResult = nullptr) override;
+		void WaitForRenderStage(RenderWorker &worker, float baseProgress, float progressMultiplier, const std::function<pragma::scenekit::Renderer::RenderStageResult()> &fOnComplete);
 		void StartTextureBaking(RenderWorker &worker);
 		virtual void PrepareCyclesSceneForRendering() override;
-		virtual bool UpdateStereoEye(unirender::RenderWorker &worker, unirender::Renderer::ImageRenderStage stage, StereoEye &eyeStage) override;
+		virtual bool UpdateStereoEye(pragma::scenekit::RenderWorker &worker, pragma::scenekit::Renderer::ImageRenderStage stage, StereoEye &eyeStage) override;
 		virtual void CloseRenderScene() override;
 		virtual void FinalizeImage(uimg::ImageBuffer &imgBuf, StereoEye eyeStage) override;
 		void InitStereoEye(StereoEye eyeStage);
 		void ReloadProgressiveRender(bool clearExposure = true, bool waitForPreviousCompletion = false);
 		int GetTileSize() const;
 
-		void SetupRenderSettings(ccl::Scene &scene, ccl::Session &session, ccl::BufferParams &bufferParams, unirender::Scene::RenderMode renderMode, uint32_t maxTransparencyBounces) const;
+		void SetupRenderSettings(ccl::Scene &scene, ccl::Session &session, ccl::BufferParams &bufferParams, pragma::scenekit::Scene::RenderMode renderMode, uint32_t maxTransparencyBounces) const;
 
 		void AddDebugSky();
 		ccl::Mesh *AddDebugMesh();
@@ -135,16 +184,16 @@ namespace unirender::cycles {
 		void InitializeDebugScene(const std::string &fileName, const std::vector<std::string> &xmlFileNames);
 		void PopulateDebugScene();
 
-		ccl::SessionParams GetSessionParameters(const unirender::Scene &scene, const ccl::DeviceInfo &devInfo) const;
+		ccl::SessionParams GetSessionParameters(const pragma::scenekit::Scene &scene, const ccl::DeviceInfo &devInfo) const;
 		ccl::BufferParams GetBufferParameters() const;
-		void SyncLight(unirender::Scene &scene, const unirender::Light &light, bool update = false);
-		void SyncCamera(const unirender::Camera &cam, bool update = false);
-		void SyncObject(const unirender::Object &obj);
-		void SyncMesh(const unirender::Mesh &mesh);
-		void InitializeSession(unirender::Scene &scene, const ccl::DeviceInfo &devInfo);
-		std::optional<ccl::DeviceInfo> InitializeDevice(const unirender::Scene &scene, std::string &outErr);
-		bool Initialize(unirender::Scene &scene, std::string &outErr);
-		unirender::Scene::DeviceType m_deviceType = unirender::Scene::DeviceType::CPU;
+		void SyncLight(pragma::scenekit::Scene &scene, const pragma::scenekit::Light &light, bool update = false);
+		void SyncCamera(const pragma::scenekit::Camera &cam, bool update = false);
+		void SyncObject(const pragma::scenekit::Object &obj);
+		void SyncMesh(const pragma::scenekit::Mesh &mesh);
+		void InitializeSession(pragma::scenekit::Scene &scene, const ccl::DeviceInfo &devInfo);
+		std::optional<ccl::DeviceInfo> InitializeDevice(const pragma::scenekit::Scene &scene, std::string &outErr);
+		bool Initialize(pragma::scenekit::Scene &scene, std::string &outErr);
+		pragma::scenekit::Scene::DeviceType m_deviceType = pragma::scenekit::Scene::DeviceType::CPU;
 		std::unique_ptr<ccl::Session> m_cclSession = nullptr;
 		DisplayDriver *m_displayDriver = nullptr;
 		OutputDriver *m_outputDriver = nullptr;
@@ -160,7 +209,7 @@ namespace unirender::cycles {
 		std::unordered_map<const Mesh *, ccl::Mesh *> m_meshToCcclMesh;
 		std::unordered_map<ccl::Mesh *, const Mesh *> m_cclMeshToMesh;
 		std::unordered_map<const Light *, ccl::Light *> m_lightToCclLight;
-		std::unordered_map<const unirender::Light *, std::shared_ptr<CCLShader>> m_lightToShader;
+		std::unordered_map<const pragma::scenekit::Light *, std::shared_ptr<CCLShader>> m_lightToShader;
 		std::atomic<uint32_t> m_restartState = 0;
 		StateFlags m_stateFlags = StateFlags::None;
 		std::mutex m_cancelMutex;
@@ -178,6 +227,4 @@ namespace unirender::cycles {
 		Scene::RenderMode m_renderMode = Scene::RenderMode::RenderImage;
 	};
 };
-REGISTER_BASIC_BITWISE_OPERATORS(unirender::cycles::Renderer::StateFlags)
-
-#endif
+REGISTER_BASIC_BITWISE_OPERATORS(pragma::scenekit::cycles::Renderer::StateFlags)

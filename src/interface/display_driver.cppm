@@ -5,8 +5,7 @@
 * Copyright (c) 2021 Silverlan
 */
 
-#ifndef __UNIRENDER_CYCLES_DISPLAY_DRIVER_HPP__
-#define __UNIRENDER_CYCLES_DISPLAY_DRIVER_HPP__
+module;
 
 #include <session/display_driver.h>
 #include <session/output_driver.h>
@@ -30,7 +29,13 @@ namespace unirender {
 	class TileManager;
 	enum class PassType : uint32_t;
 };
-namespace unirender::cycles {
+
+export module pragma.scenekit.cycles:display_driver;
+
+import pragma.scenekit;
+
+export namespace pragma::scenekit::cycles
+{
 	class BaseDriver {
 	  public:
 		BaseDriver(uint32_t width, uint32_t height);
@@ -42,7 +47,7 @@ namespace unirender::cycles {
 
 	class DisplayDriver : public ccl::DisplayDriver, public BaseDriver {
 	  public:
-		DisplayDriver(unirender::TileManager &tileManager, uint32_t width, uint32_t height);
+		DisplayDriver(pragma::scenekit::TileManager &tileManager, uint32_t width, uint32_t height);
 		virtual ~DisplayDriver() override;
 		virtual bool update_begin(const Params &params, int width, int height) override;
 		virtual void update_end() override;
@@ -74,7 +79,7 @@ namespace unirender::cycles {
 		Vector2i m_mappedSize = {0, 0};
 		uint32_t m_mappedTileIndex = 0;
 
-		unirender::TileManager &m_tileManager;
+		pragma::scenekit::TileManager &m_tileManager;
 		std::atomic<bool> m_tileWritten = false;
 		std::thread m_postProcessingThread;
 		std::mutex m_postProcessingMutex;
@@ -116,10 +121,8 @@ namespace unirender::cycles {
 	  private:
 		void DebugDumpImages();
 		std::vector<Vector4> m_tileData;
-		std::unordered_map<unirender::PassType, PassInfo> m_imageBuffers;
+		std::unordered_map<pragma::scenekit::PassType, PassInfo> m_imageBuffers;
 		const util::baking::BakeDataView *m_bakeData = nullptr;
-		std::vector<std::pair<unirender::PassType, uimg::Format>> m_passes;
+		std::vector<std::pair<pragma::scenekit::PassType, uimg::Format>> m_passes;
 	};
 };
-
-#endif

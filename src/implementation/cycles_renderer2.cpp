@@ -6,29 +6,10 @@
 * Copyright (c) 2021 Silverlan
 */
 
-#include "util_raytracing/scene.hpp"
-#include "util_raytracing/mesh.hpp"
-#include "util_raytracing/object.hpp"
-#include "util_raytracing/scene.hpp"
-#include "util_raytracing/light.hpp"
-#include "util_raytracing/camera.hpp"
-#include "unirender/cycles/baking.hpp"
-#include "unirender/cycles/renderer.hpp"
-#include "unirender/cycles/display_driver.hpp"
-#include "util_raytracing/shader_nodes.hpp"
-#include "unirender/cycles/ccl_shader.hpp"
-#include "util_raytracing/model_cache.hpp"
-#include "util_raytracing/color_management.hpp"
-#include "util_raytracing/denoise.hpp"
-#include <sharedutils/util_hair.hpp>
-#include <sharedutils/util_baking.hpp>
-#include <spdlog/logger.h>
-#include <fsys/ifile.hpp>
-#include <util_ocio.hpp>
+module;
+
 #include <scene/light.h>
 #include <scene/camera.h>
-#include <mathutil/umath_lighting.hpp>
-#include <mathutil/units.h>
 #include <session/buffers.h>
 #include <scene/scene.h>
 #include <session/session.h>
@@ -42,18 +23,30 @@
 #include <scene/svm.h>
 #include <scene/bake.h>
 #include <scene/particles.h>
-#include <scene/hair.h>
 #include <util/path.h>
+#include <udm.hpp>
 // #define ENABLE_CYCLES_LOGGING
 #ifdef ENABLE_CYCLES_LOGGING
 #define GLOG_NO_ABBREVIATED_SEVERITIES
 #include <glog/logging.h>
 #endif
-#include <util_image_buffer.hpp>
 
 #ifdef _WIN32
 #include <Shlobj.h>
 #endif
+
+#include <util_image.hpp>
+#include <util_image_buffer.hpp>
+#include <sharedutils/util_baking.hpp>
+#include <spdlog/logger.h>
+#include <fsys/ifile.hpp>
+#include <util_ocio.hpp>
+#include <mathutil/umath_lighting.hpp>
+#include <mathutil/units.h>
+
+module pragma.scenekit.cycles;
+
+import pragma.scenekit;
 
 static void validate_session(ccl::Scene &scene)
 {
@@ -118,7 +111,7 @@ static void fix_nan_pixels(uimg::ImageBuffer &imgBuf)
 }
 
 #if 0
-static void debug_dump_images(std::unordered_map<std::string,std::array<std::shared_ptr<uimg::ImageBuffer>,umath::to_integral(unirender::Renderer::StereoEye::Count)>> &resultImageBuffers)
+static void debug_dump_images(std::unordered_map<std::string,std::array<std::shared_ptr<uimg::ImageBuffer>,umath::to_integral(pragma::scenekit::Renderer::StereoEye::Count)>> &resultImageBuffers)
 {
 	for(auto &pair : resultImageBuffers)
 	{
@@ -140,9 +133,9 @@ static void debug_dump_images(std::unordered_map<std::string,std::array<std::sha
 }
 #endif
 
-util::EventReply unirender::cycles::Renderer::HandleRenderStage(RenderWorker &worker, unirender::Renderer::ImageRenderStage stage, StereoEye eyeStage, unirender::Renderer::RenderStageResult *optResult)
+util::EventReply pragma::scenekit::cycles::Renderer::HandleRenderStage(RenderWorker &worker, pragma::scenekit::Renderer::ImageRenderStage stage, StereoEye eyeStage, pragma::scenekit::Renderer::RenderStageResult *optResult)
 {
-	auto handled = unirender::Renderer::HandleRenderStage(worker, stage, eyeStage, optResult);
+	auto handled = pragma::scenekit::Renderer::HandleRenderStage(worker, stage, eyeStage, optResult);
 	if(handled == util::EventReply::Handled)
 		return handled;
 	switch(stage) {
@@ -385,11 +378,11 @@ util::EventReply unirender::cycles::Renderer::HandleRenderStage(RenderWorker &wo
 		}
 	}
 	if(optResult)
-		*optResult = unirender::Renderer::RenderStageResult::Continue;
+		*optResult = pragma::scenekit::Renderer::RenderStageResult::Continue;
 	return util::EventReply::Handled;
 }
 
-void unirender::cycles::Renderer::WaitForRenderStage(RenderWorker &worker, float baseProgress, float progressMultiplier, const std::function<RenderStageResult()> &fOnComplete)
+void pragma::scenekit::cycles::Renderer::WaitForRenderStage(RenderWorker &worker, float baseProgress, float progressMultiplier, const std::function<RenderStageResult()> &fOnComplete)
 {
 	for(;;) {
 		worker.UpdateProgress(baseProgress + umath::min(m_cclSession->progress.get_progress(), 1.0) * progressMultiplier);
@@ -418,7 +411,7 @@ void unirender::cycles::Renderer::WaitForRenderStage(RenderWorker &worker, float
 		if(m_cclSession->progress.get_cancel()) {
 			if(m_restartState != 0)
 				continue;
-			auto &logger = unirender::get_logger();
+			auto &logger = pragma::scenekit::get_logger();
 			if(logger)
 				logger->error("Cycles rendering has been cancelled: {}", m_cclSession->progress.get_cancel_message());
 			worker.Cancel(m_cclSession->progress.get_cancel_message(), 1 /* error code */);
@@ -429,7 +422,7 @@ void unirender::cycles::Renderer::WaitForRenderStage(RenderWorker &worker, float
 			std::string status;
 			std::string subStatus;
 			m_cclSession->progress.get_status(status, subStatus);
-			auto &logger = unirender::get_logger();
+			auto &logger = pragma::scenekit::get_logger();
 			if(logger)
 				logger->error("Cycles rendering has failed at status '{}' ({}) with error: {}", status, subStatus, m_cclSession->progress.get_error_message());
 			worker.SetStatus(util::JobStatus::Failed, m_cclSession->progress.get_error_message());
@@ -445,7 +438,7 @@ void unirender::cycles::Renderer::WaitForRenderStage(RenderWorker &worker, float
 			auto isBuildingKernels = (status == "Loading render kernels (may take a few minutes the first time)");
 			SetIsBuildingKernels(isBuildingKernels);
 
-			auto &logger = unirender::get_logger();
+			auto &logger = pragma::scenekit::get_logger();
 			if(logger)
 				logger->info("Session status: {} ({})", status, subStatus);
 		}
@@ -461,7 +454,7 @@ void unirender::cycles::Renderer::WaitForRenderStage(RenderWorker &worker, float
 		worker.SetStatus(util::JobStatus::Successful);
 }
 
-void unirender::cycles::Renderer::InitStereoEye(StereoEye eyeStage)
+void pragma::scenekit::cycles::Renderer::InitStereoEye(StereoEye eyeStage)
 {
 	if(eyeStage == StereoEye::Left) {
 		// Switch to right eye
@@ -477,7 +470,7 @@ void unirender::cycles::Renderer::InitStereoEye(StereoEye eyeStage)
 	}
 }
 
-bool unirender::cycles::Renderer::UpdateStereoEye(unirender::RenderWorker &worker, ImageRenderStage stage, StereoEye &eyeStage)
+bool pragma::scenekit::cycles::Renderer::UpdateStereoEye(pragma::scenekit::RenderWorker &worker, ImageRenderStage stage, StereoEye &eyeStage)
 {
 	if(eyeStage == StereoEye::Left) {
 		// Switch to right eye
@@ -492,9 +485,9 @@ bool unirender::cycles::Renderer::UpdateStereoEye(unirender::RenderWorker &worke
 	return false;
 }
 
-int unirender::cycles::Renderer::GetTileSize() const { return m_cclSession->params.tile_size; }
+int pragma::scenekit::cycles::Renderer::GetTileSize() const { return m_cclSession->params.tile_size; }
 
-void unirender::cycles::Renderer::ReloadProgressiveRender(bool clearExposure, bool waitForPreviousCompletion)
+void pragma::scenekit::cycles::Renderer::ReloadProgressiveRender(bool clearExposure, bool waitForPreviousCompletion)
 {
 	auto &createInfo = m_scene->GetCreateInfo();
 	if(createInfo.progressive == false)
@@ -506,9 +499,9 @@ void unirender::cycles::Renderer::ReloadProgressiveRender(bool clearExposure, bo
 	m_cclSession->progress.reset();
 }
 
-void unirender::cycles::Renderer::PrepareCyclesSceneForRendering() { unirender::Renderer::PrepareCyclesSceneForRendering(); }
+void pragma::scenekit::cycles::Renderer::PrepareCyclesSceneForRendering() { pragma::scenekit::Renderer::PrepareCyclesSceneForRendering(); }
 
-void unirender::cycles::Renderer::SetCancelled(const std::string &msg)
+void pragma::scenekit::cycles::Renderer::SetCancelled(const std::string &msg)
 {
 	std::scoped_lock lock {m_cancelMutex};
 	if(m_cancelled || m_cclSession == nullptr)
@@ -520,7 +513,7 @@ void unirender::cycles::Renderer::SetCancelled(const std::string &msg)
 	SetIsBuildingKernels(false);
 }
 
-void unirender::cycles::Renderer::CloseCyclesScene()
+void pragma::scenekit::cycles::Renderer::CloseCyclesScene()
 {
 	m_renderData = {};
 	m_tileManager.StopAndWait();
@@ -532,7 +525,7 @@ void unirender::cycles::Renderer::CloseCyclesScene()
 	SetIsBuildingKernels(false);
 }
 
-bool unirender::cycles::Renderer::InitializeBakingData()
+bool pragma::scenekit::cycles::Renderer::InitializeBakingData()
 {
 	auto *bakeName = m_scene->GetBakeTargetName();
 	if(!bakeName)
@@ -561,7 +554,7 @@ bool unirender::cycles::Renderer::InitializeBakingData()
 	m_bakeData->objectId = *objectId;
 	return true;
 }
-void unirender::cycles::Renderer::StartTextureBaking(RenderWorker &worker)
+void pragma::scenekit::cycles::Renderer::StartTextureBaking(RenderWorker &worker)
 {
 #if 0
 	// Baking cannot be done with cycles directly, we will have to
@@ -701,11 +694,11 @@ void unirender::cycles::Renderer::StartTextureBaking(RenderWorker &worker)
 			worker.SetStatus(util::JobStatus::Failed,"Invalid bake target!");
 			return;
 		}
-		std::vector<unirender::baking::BakePixel> pixelArray;
+		std::vector<pragma::scenekit::baking::BakePixel> pixelArray;
 		pixelArray.resize(numPixels);
 		auto bakeLightmaps = (m_renderMode == Scene::RenderMode::BakeDiffuseLighting);
 
-		unirender::baking::prepare_bake_data(*this,*o,pixelArray.data(),numPixels,imgWidth,imgHeight,bakeLightmaps);
+		pragma::scenekit::baking::prepare_bake_data(*this,*o,pixelArray.data(),numPixels,imgWidth,imgHeight,bakeLightmaps);
 		
 		if(worker.IsCancelled())
 			return;
@@ -848,7 +841,7 @@ void unirender::cycles::Renderer::StartTextureBaking(RenderWorker &worker)
 			worker.SetResultMessage("Baking margin...");
 
 			imgBuffer->Convert(uimg::Format::RGBA_FLOAT);
-			unirender::baking::ImBuf ibuf {};
+			pragma::scenekit::baking::ImBuf ibuf {};
 			ibuf.x = imgWidth;
 			ibuf.y = imgHeight;
 			ibuf.rect = imgBuffer;
@@ -929,7 +922,7 @@ void unirender::cycles::Renderer::StartTextureBaking(RenderWorker &worker)
 #endif
 }
 
-void unirender::cycles::Renderer::FinalizeAndCloseCyclesScene()
+void pragma::scenekit::cycles::Renderer::FinalizeAndCloseCyclesScene()
 {
 	auto stateFlags = m_scene->GetStateFlags();
 	if(m_cclSession && m_outputDriver && m_scene->IsRenderSceneMode(m_scene->GetRenderMode()) && umath::is_flag_set(m_stateFlags, StateFlags::RenderingStarted)) {
@@ -940,73 +933,73 @@ void unirender::cycles::Renderer::FinalizeAndCloseCyclesScene()
 	CloseCyclesScene();
 }
 
-void unirender::cycles::Renderer::CloseRenderScene() { CloseCyclesScene(); }
+void pragma::scenekit::cycles::Renderer::CloseRenderScene() { CloseCyclesScene(); }
 
-void unirender::cycles::Renderer::FinalizeImage(uimg::ImageBuffer &imgBuf, StereoEye eyeStage)
+void pragma::scenekit::cycles::Renderer::FinalizeImage(uimg::ImageBuffer &imgBuf, StereoEye eyeStage)
 {
 	if(!m_scene->HasBakeTarget()) // Don't need to flip if we're baking
 		imgBuf.Flip(true, true);
 }
 
-static std::optional<ccl::PassType> pass_type_to_ccl_pass_type(unirender::PassType passType)
+static std::optional<ccl::PassType> pass_type_to_ccl_pass_type(pragma::scenekit::PassType passType)
 {
 	switch(passType) {
-	case unirender::PassType::Combined:
+	case pragma::scenekit::PassType::Combined:
 		return ccl::PassType::PASS_COMBINED;
-	case unirender::PassType::Albedo:
+	case pragma::scenekit::PassType::Albedo:
 		return ccl::PassType::PASS_DIFFUSE_COLOR;
-	case unirender::PassType::Normals:
+	case pragma::scenekit::PassType::Normals:
 		return ccl::PassType::PASS_NORMAL;
-	case unirender::PassType::Depth:
+	case pragma::scenekit::PassType::Depth:
 		return ccl::PassType::PASS_DEPTH;
-	case unirender::PassType::Emission:
+	case pragma::scenekit::PassType::Emission:
 		return ccl::PassType::PASS_EMISSION;
-	case unirender::PassType::Background:
+	case pragma::scenekit::PassType::Background:
 		return ccl::PassType::PASS_BACKGROUND;
-	case unirender::PassType::Ao:
+	case pragma::scenekit::PassType::Ao:
 		return ccl::PassType::PASS_AO;
-	case unirender::PassType::Diffuse:
+	case pragma::scenekit::PassType::Diffuse:
 		return ccl::PassType::PASS_DIFFUSE;
-	case unirender::PassType::DiffuseDirect:
+	case pragma::scenekit::PassType::DiffuseDirect:
 		return ccl::PassType::PASS_DIFFUSE_DIRECT;
-	case unirender::PassType::DiffuseIndirect:
+	case pragma::scenekit::PassType::DiffuseIndirect:
 		return ccl::PassType::PASS_DIFFUSE_INDIRECT;
-	case unirender::PassType::Glossy:
+	case pragma::scenekit::PassType::Glossy:
 		return ccl::PassType::PASS_GLOSSY;
-	case unirender::PassType::GlossyDirect:
+	case pragma::scenekit::PassType::GlossyDirect:
 		return ccl::PassType::PASS_GLOSSY_DIRECT;
-	case unirender::PassType::GlossyIndirect:
+	case pragma::scenekit::PassType::GlossyIndirect:
 		return ccl::PassType::PASS_GLOSSY_INDIRECT;
-	case unirender::PassType::Transmission:
+	case pragma::scenekit::PassType::Transmission:
 		return ccl::PassType::PASS_TRANSMISSION;
-	case unirender::PassType::TransmissionDirect:
+	case pragma::scenekit::PassType::TransmissionDirect:
 		return ccl::PassType::PASS_TRANSMISSION_DIRECT;
-	case unirender::PassType::TransmissionIndirect:
+	case pragma::scenekit::PassType::TransmissionIndirect:
 		return ccl::PassType::PASS_TRANSMISSION_INDIRECT;
-	case unirender::PassType::Volume:
+	case pragma::scenekit::PassType::Volume:
 		return ccl::PassType::PASS_VOLUME;
-	case unirender::PassType::VolumeDirect:
+	case pragma::scenekit::PassType::VolumeDirect:
 		return ccl::PassType::PASS_VOLUME_DIRECT;
-	case unirender::PassType::VolumeIndirect:
+	case pragma::scenekit::PassType::VolumeIndirect:
 		return ccl::PassType::PASS_VOLUME_INDIRECT;
-	case unirender::PassType::Position:
+	case pragma::scenekit::PassType::Position:
 		return ccl::PassType::PASS_POSITION;
-	case unirender::PassType::Roughness:
+	case pragma::scenekit::PassType::Roughness:
 		return ccl::PassType::PASS_ROUGHNESS;
-	case unirender::PassType::Uv:
+	case pragma::scenekit::PassType::Uv:
 		return ccl::PassType::PASS_UV;
-	case unirender::PassType::DiffuseColor:
+	case pragma::scenekit::PassType::DiffuseColor:
 		return ccl::PassType::PASS_DIFFUSE_COLOR;
-	case unirender::PassType::GlossyColor:
+	case pragma::scenekit::PassType::GlossyColor:
 		return ccl::PassType::PASS_GLOSSY_COLOR;
-	case unirender::PassType::TransmissionColor:
+	case pragma::scenekit::PassType::TransmissionColor:
 		return ccl::PassType::PASS_TRANSMISSION_COLOR;
 	}
-	static_assert(umath::to_integral(unirender::PassType::Count) == 25, "Update this implementation when new types are added!");
+	static_assert(umath::to_integral(pragma::scenekit::PassType::Count) == 25, "Update this implementation when new types are added!");
 	return {};
 }
 
-void unirender::cycles::Renderer::SetupRenderSettings(ccl::Scene &scene, ccl::Session &session, ccl::BufferParams &bufferParams, unirender::Scene::RenderMode renderMode, uint32_t maxTransparencyBounces) const
+void pragma::scenekit::cycles::Renderer::SetupRenderSettings(ccl::Scene &scene, ccl::Session &session, ccl::BufferParams &bufferParams, pragma::scenekit::Scene::RenderMode renderMode, uint32_t maxTransparencyBounces) const
 {
 	auto &sceneInfo = m_scene->GetSceneInfo();
 	// Default parameters taken from Blender
@@ -1122,7 +1115,7 @@ void unirender::cycles::Renderer::SetupRenderSettings(ccl::Scene &scene, ccl::Se
 	film.set_exposure(1.f);
 	film.set_filter_type(ccl::FilterType::FILTER_GAUSSIAN);
 	film.set_filter_width(1.5f);
-	if(renderMode == unirender::Scene::RenderMode::RenderImage) {
+	if(renderMode == pragma::scenekit::Scene::RenderMode::RenderImage) {
 		film.set_mist_start(5.f);
 		film.set_mist_depth(25.f);
 		film.set_mist_falloff(2.f);
@@ -1159,26 +1152,26 @@ void unirender::cycles::Renderer::SetupRenderSettings(ccl::Scene &scene, ccl::Se
 				pass->set_include_albedo(false);
 
 			if(pair.first == PassType::Albedo) {
-				if(m_scene->GetRenderMode() == unirender::Scene::RenderMode::SceneAlbedo)
+				if(m_scene->GetRenderMode() == pragma::scenekit::Scene::RenderMode::SceneAlbedo)
 					pass->set_type(ccl::PASS_DIFFUSE_COLOR);
 				else
 					pass->set_type(ccl::PASS_DENOISING_ALBEDO);
 			}
 			if(pair.first == PassType::Normals) {
-				if(m_scene->GetRenderMode() == unirender::Scene::RenderMode::SceneNormals)
+				if(m_scene->GetRenderMode() == pragma::scenekit::Scene::RenderMode::SceneNormals)
 					pass->set_type(ccl::PASS_NORMAL);
 				else
 					pass->set_type(ccl::PASS_DENOISING_NORMAL);
 			}
 			if(pair.first == PassType::Depth) {
-				if(m_scene->GetRenderMode() == unirender::Scene::RenderMode::SceneDepth)
+				if(m_scene->GetRenderMode() == pragma::scenekit::Scene::RenderMode::SceneDepth)
 					pass->set_type(ccl::PASS_DEPTH);
 				else
 					pass->set_type(ccl::PASS_DENOISING_DEPTH);
 			}
 		}
 		else {
-			auto &logger = unirender::get_logger();
+			auto &logger = pragma::scenekit::get_logger();
 			if(logger)
 				logger->error("Unsupported pass type: {}", magic_enum::enum_name(pair.first));
 			continue;

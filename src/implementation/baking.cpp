@@ -14,15 +14,16 @@
 * limitations under the License.
 */
 
-#include "unirender/cycles/baking.hpp"
-#include "util_raytracing/mesh.hpp"
-#include "util_raytracing/object.hpp"
-#include "util_raytracing/scene.hpp"
-#include "unirender/cycles/renderer.hpp"
+module;
+
 #include <sharedutils/util_baking.hpp>
 #include <scene/mesh.h>
 
-void unirender::baking::prepare_bake_data(const cycles::Renderer &renderer, unirender::Object &o, util::baking::BakePixel *pixelArray, uint32_t numPixels, uint32_t imgWidth, uint32_t imgHeight, bool useLightmapUvs)
+module pragma.scenekit.cycles;
+
+import pragma.scenekit;
+
+void pragma::scenekit::baking::prepare_bake_data(const pragma::scenekit::cycles::Renderer &renderer, pragma::scenekit::Object &o, util::baking::BakePixel *pixelArray, uint32_t numPixels, uint32_t imgWidth, uint32_t imgHeight, bool useLightmapUvs)
 {
 	auto objId = renderer.FindCCLObjectId(*renderer.FindCclObject(o));
 	assert(objId.has_value());
