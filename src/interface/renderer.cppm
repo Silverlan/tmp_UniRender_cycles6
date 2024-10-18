@@ -7,50 +7,7 @@
 
 module;
 
-namespace uimg {
-	class ImageBuffer;
-	struct ImageLayerSet;
-};
-namespace util::ocio {
-	class ColorProcessor;
-};
-namespace oidn {
-	class DeviceRef;
-};
-
-namespace ccl {
-	class Session;
-	class Scene;
-	class ShaderInput;
-	class ShaderNode;
-	class ShaderOutput;
-	class ShaderGraph;
-	struct float3;
-	struct float2;
-	struct Transform;
-	class ImageTextureNode;
-	class EnvironmentTextureNode;
-	class BufferParams;
-	class SessionParams;
-};
-namespace udm {
-	struct Property;
-};
-namespace OpenImageIO_v2_1 {
-	class ustring;
-};
-namespace umath {
-	class Transform;
-	class ScaledTransform;
-};
-namespace spdlog {
-	class logger;
-};
-namespace OpenSubdiv::v3_6_0::Far {
-	class PrimvarRefiner;
-};
-class DataStream;
-
+#include "definitions.hpp"
 #include <sharedutils/util_baking.hpp>
 #include <sharedutils/util.h>
 #include <mathutil/uvec.h>
@@ -59,16 +16,9 @@ class DataStream;
 #include <cinttypes>
 #include <atomic>
 
-import pragma.scenekit;
-
-namespace unirender {
-	class Scene;
-	namespace cycles {
-		class Renderer;
-	};
-};
-
 export module pragma.scenekit.cycles:renderer;
+
+import pragma.scenekit;
 
 export namespace pragma::scenekit::cycles
 {

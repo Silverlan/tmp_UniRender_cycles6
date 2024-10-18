@@ -16,14 +16,11 @@
 
 module;
 
+#include "definitions.hpp"
 #include "scene/bake.h"
 #include <util_image_buffer.hpp>
 #include <cinttypes>
 #include <vector>
-
-namespace util::baking {
-	struct BakePixel;
-};
 
 export module pragma.scenekit.cycles:baking;
 

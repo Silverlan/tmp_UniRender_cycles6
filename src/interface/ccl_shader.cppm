@@ -7,20 +7,12 @@
 
 module;
 
+#include "definitions.hpp"
 #include <scene/shader_nodes.h>
 #include <sharedutils/datastream.h>
 #include <sharedutils/util_virtual_shared_from_this.hpp>
 #include <kernel/types.h>
 #include <kernel/svm/types.h>
-
-namespace ccl {
-	class Scene;
-	class Shader;
-	class ShaderGraph;
-	class ShaderNode;
-	class ShaderInput;
-	class ShaderOutput;
-};
 
 export module pragma.scenekit.cycles:ccl_shader;
 

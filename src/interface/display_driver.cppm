@@ -7,6 +7,7 @@
 
 module;
 
+#include "definitions.hpp"
 #include <session/display_driver.h>
 #include <session/output_driver.h>
 #include <util_image_types.hpp>
@@ -18,17 +19,6 @@ module;
 #include <queue>
 #include <memory>
 #include <vector>
-
-namespace uimg {
-	class ImageBuffer;
-};
-namespace util::baking {
-	struct BakeDataView;
-};
-namespace unirender {
-	class TileManager;
-	enum class PassType : uint32_t;
-};
 
 export module pragma.scenekit.cycles:display_driver;
 
