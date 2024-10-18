@@ -8,6 +8,8 @@
 #ifndef __UNIRENDER_CYCLES_DEFINITIONS_HPP__
 #define __UNIRENDER_CYCLES_DEFINITIONS_HPP__
 
+#include <cinttypes>
+
 namespace uimg {
 	class ImageBuffer;
 	struct ImageLayerSet;
