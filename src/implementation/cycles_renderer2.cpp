@@ -40,13 +40,13 @@ module;
 #include <sharedutils/util_baking.hpp>
 #include <spdlog/logger.h>
 #include <fsys/ifile.hpp>
-#include <util_ocio.hpp>
 #include <mathutil/umath_lighting.hpp>
 #include <mathutil/units.h>
 
 module pragma.scenekit.cycles;
 
 import pragma.scenekit;
+import pragma.ocio;
 
 static void validate_session(ccl::Scene &scene)
 {

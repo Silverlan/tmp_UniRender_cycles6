@@ -29,7 +29,6 @@ module;
 #include <sharedutils/util_pragma.hpp>
 #include <sharedutils/util_parallel_job.hpp>
 #include <fsys/ifile.hpp>
-#include <util_ocio.hpp>
 #include <mathutil/umath_lighting.hpp>
 #include <mathutil/units.h>
 #include <util/path.h>
@@ -50,6 +49,7 @@ module;
 module pragma.scenekit.cycles;
 
 import pragma.scenekit;
+import pragma.ocio;
 
 static std::optional<std::string> KERNEL_PATH {};
 void pragma::scenekit::Scene::SetKernelPath(const std::string &kernelPath) { KERNEL_PATH = kernelPath; }
