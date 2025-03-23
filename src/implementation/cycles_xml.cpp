@@ -16,7 +16,9 @@
 
 module;
 
-#ifdef _WIN32
+#ifdef __linux__
+module pragma.scenekit.cycles;
+#else
 #include <stdio.h>
 
 #include <algorithm>

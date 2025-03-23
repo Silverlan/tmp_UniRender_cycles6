@@ -38,6 +38,8 @@ module;
 #include <util_image.hpp>
 #include <util_image_buffer.hpp>
 #include <sharedutils/util_baking.hpp>
+#include <sharedutils/util_event_reply.hpp>
+#include <sharedutils/util_parallel_job.hpp>
 #include <spdlog/logger.h>
 #include <fsys/ifile.hpp>
 #include <mathutil/umath_lighting.hpp>

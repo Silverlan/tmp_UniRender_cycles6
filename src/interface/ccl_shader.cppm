@@ -8,6 +8,7 @@
 module;
 
 #include "definitions.hpp"
+#include <util/math.h>
 #include <scene/shader_nodes.h>
 #include <sharedutils/datastream.h>
 #include <sharedutils/util_virtual_shared_from_this.hpp>

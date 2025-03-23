@@ -19,14 +19,15 @@ module;
 #include "definitions.hpp"
 #include "scene/bake.h"
 #include <util_image_buffer.hpp>
+#include <util/math.h>
 #include <cinttypes>
 #include <vector>
 
 export module pragma.scenekit.cycles:baking;
 
+import pragma.scenekit;
+
 export namespace pragma::scenekit {
-	class Object;
-	class Scene;
 	namespace cycles {
 		class Renderer;
 	};

@@ -10,6 +10,7 @@ module;
 #include <spdlog/logger.h>
 #include <scene/light.h>
 #include <scene/camera.h>
+#include <app/cycles_xml.h>
 #include <session/buffers.h>
 #include <scene/scene.h>
 #include <session/session.h>
@@ -52,7 +53,7 @@ import pragma.scenekit;
 import pragma.ocio;
 
 static std::optional<std::string> KERNEL_PATH {};
-void pragma::scenekit::Scene::SetKernelPath(const std::string &kernelPath) { KERNEL_PATH = kernelPath; }
+static void set_kernel_path(const std::string &kernelPath) { KERNEL_PATH = kernelPath; }
 int cycles_standalone_test(int argc, const char **argv, bool initPaths);
 static void init_cycles()
 {
@@ -155,7 +156,7 @@ ccl::float3 pragma::scenekit::cycles::Renderer::ToCyclesPosition(const Vector3 &
 #else
 	ccl::float3 cpos {-pos.x, pos.y, pos.z};
 #endif
-	cpos *= scale;
+	cpos = cpos *static_cast<float>(scale);
 	return cpos;
 }
 
@@ -1077,7 +1078,6 @@ struct Options {
 	ccl::string output_pass;
 };
 
-#include "app/cycles_xml.h"
 static void scene_init(Options &options)
 {
 	options.scene = options.session->scene;
@@ -2187,7 +2187,7 @@ extern "C" {
 bool DLLEXPORT create_renderer(const pragma::scenekit::Scene &scene, pragma::scenekit::Renderer::Flags flags, std::shared_ptr<pragma::scenekit::Renderer> &outRenderer, std::string &outErr)
 {
 	auto kernelPath = util::get_program_path() + "/modules/unirender/cycles";
-	pragma::scenekit::Scene::SetKernelPath(kernelPath);
+	set_kernel_path(kernelPath);
 
 	// Cycles can build the kernels during runtime if they don't exist, but unfortunately
 	// it refuses to do so if the "lib" directory exists (because it assumes that the kernels have been

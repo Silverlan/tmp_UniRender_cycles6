@@ -17,7 +17,11 @@ module;
 #include <sharedutils/magic_enum.hpp>
 #include <fsys/filesystem.h>
 #include <fsys/ifile.hpp>
+#include <util/half.h>
+#include <queue>
 #include <mutex>
+#include <memory>
+#include <cstring>
 
 module pragma.scenekit.cycles;
 

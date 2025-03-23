@@ -8,6 +8,7 @@
 module;
 
 #include "definitions.hpp"
+#include <util/math.h>
 #include <session/display_driver.h>
 #include <session/output_driver.h>
 #include <util_image_types.hpp>

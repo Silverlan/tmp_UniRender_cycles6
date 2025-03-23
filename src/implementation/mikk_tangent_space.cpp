@@ -16,11 +16,14 @@
 
 // Source: blender/intern/cycles/blender/blender_mesh.cpp
 
+module;
+
 #include <scene/mesh.h>
 #include <mikktspace.h>
 
-import pragma.scenekit.cycles;
 import pragma.scenekit;
+
+module pragma.scenekit.cycles;
 
 struct MikkUserData {
   MikkUserData(

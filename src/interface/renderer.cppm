@@ -8,16 +8,21 @@
 module;
 
 #include "definitions.hpp"
+#include <util/math.h>
 #include <sharedutils/util_baking.hpp>
+#include <sharedutils/util_parallel_job.hpp>
 #include <sharedutils/util.h>
+#include <sharedutils/util_event_reply.hpp>
 #include <mathutil/uvec.h>
 #include <mathutil/transform.hpp>
 #include <session/session.h>
+#include <scene/shader_graph.h>
 #include <cinttypes>
 #include <atomic>
 
 export module pragma.scenekit.cycles:renderer;
 
+import :ccl_shader;
 import pragma.scenekit;
 
 export namespace pragma::scenekit::cycles

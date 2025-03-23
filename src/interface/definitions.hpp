@@ -9,6 +9,7 @@
 #define __UNIRENDER_CYCLES_DEFINITIONS_HPP__
 
 #include <cinttypes>
+#include <util/math.h>
 
 namespace uimg {
 	class ImageBuffer;
@@ -21,21 +22,6 @@ namespace oidn {
 	class DeviceRef;
 };
 
-namespace ccl {
-	class Session;
-	class Scene;
-	class ShaderInput;
-	class ShaderNode;
-	class ShaderOutput;
-	class ShaderGraph;
-	struct float3;
-	struct float2;
-	struct Transform;
-	class ImageTextureNode;
-	class EnvironmentTextureNode;
-	class BufferParams;
-	class SessionParams;
-};
 namespace udm {
 	struct Property;
 };
@@ -57,10 +43,6 @@ class DataStream;
 namespace util::baking {
 	struct BakePixel;
 	struct BakeDataView;
-};
-namespace pragma::scenekit {
-	class TileManager;
-	enum class PassType : uint32_t;
 };
 
 #endif
