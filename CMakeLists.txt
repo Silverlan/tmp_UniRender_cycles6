@@ -62,8 +62,10 @@ pr_add_compile_definitions(${PROJ_NAME}
 	PUBLIC
 )
 if(WIN32)
-	-DWITH_CUDA
-	-DWITH_CUDA_DYNLOAD
+	pr_add_compile_definitions(${PROJ_NAME}
+		-DWITH_CUDA
+		-DWITH_CUDA_DYNLOAD
+	)
 endif()
 pr_add_compile_definitions(${PROJ_NAME} -DCCL_NAMESPACE_BEGIN=namespace\ ccl\ { PUBLIC)
 pr_add_compile_definitions(${PROJ_NAME} -DCCL_NAMESPACE_END=} PUBLIC)
