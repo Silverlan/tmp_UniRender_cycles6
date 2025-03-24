@@ -45,8 +45,6 @@ pr_add_external_dependency(${PROJ_NAME} openexr_util LINK_ONLY)
 # These have to match the definitions in the cycles project!
 pr_add_compile_definitions(${PROJ_NAME}
 	-DBOOST_ALL_NO_LIB
-	-DWITH_CUDA
-	-DWITH_CUDA_DYNLOAD
 	-DWITH_HIP
 	-DWITH_HIP_DYNLOAD
 	-DWITH_OPTIX
@@ -63,6 +61,10 @@ pr_add_compile_definitions(${PROJ_NAME}
 	-DWITH_KERNEL_AVX2
 	PUBLIC
 )
+if(WIN32)
+	-DWITH_CUDA
+	-DWITH_CUDA_DYNLOAD
+endif()
 pr_add_compile_definitions(${PROJ_NAME} -DCCL_NAMESPACE_BEGIN=namespace\ ccl\ { PUBLIC)
 pr_add_compile_definitions(${PROJ_NAME} -DCCL_NAMESPACE_END=} PUBLIC)
 if(ROLLBACK_CYCLES_4_1_1)
