@@ -54,7 +54,9 @@ import pragma.ocio;
 
 static std::optional<std::string> KERNEL_PATH {};
 static void set_kernel_path(const std::string &kernelPath) { KERNEL_PATH = kernelPath; }
+#ifdef _WIN32
 int cycles_standalone_test(int argc, const char **argv, bool initPaths);
+#endif
 static void init_cycles()
 {
 	static auto isInitialized = false;
@@ -1078,6 +1080,8 @@ struct Options {
 	ccl::string output_pass;
 };
 
+#if 0
+// For testing purposes
 static void scene_init(Options &options)
 {
 	options.scene = options.session->scene;
@@ -1098,6 +1102,7 @@ static void scene_init(Options &options)
 	/* Calculate Viewplane */
 	options.scene->camera->compute_auto_viewplane();
 }
+#endif
 
 static ccl::BufferParams &session_buffer_params(Options &opts)
 {
@@ -1362,8 +1367,12 @@ void pragma::scenekit::cycles::Renderer::InitializeDebugScene(const std::string 
 	SyncCamera(cam);
 
 	PopulateDebugScene();
+	
+	// TODO: Not yet implemented for Linux
+#ifndef __linux__
 	for(auto &filepath : xmlFileNames)
 		ccl::xml_read_file(opts.scene, filepath.c_str());
+#endif
 
 	if(!opts.output_filepath.empty()) {
 		opts.session->set_output_driver(make_unique<COIIOOutputDriver>(opts.output_filepath, opts.output_pass, session_print));
@@ -1489,6 +1498,7 @@ bool pragma::scenekit::cycles::Renderer::Initialize(pragma::scenekit::Scene &sce
 	}
 
 	auto apiData = GetApiData();
+#ifdef _WIN32
 	auto udmDebugStandalone = apiData.GetFromPath("cycles/debug/debugStandalone");
 	if(udmDebugStandalone) {
 		std::string xmlFile;
@@ -1512,6 +1522,7 @@ bool pragma::scenekit::cycles::Renderer::Initialize(pragma::scenekit::Scene &sce
 		cycles_standalone_test(9, args, false);
 		return false;
 	}
+#endif
 
 	auto nativeDenoising = false;
 	auto udmDebug = apiData.GetFromPath("cycles/debug");
