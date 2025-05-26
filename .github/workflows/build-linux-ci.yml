@@ -55,56 +55,9 @@ jobs:
           cd $root
           mkdir -p release/modules/unirender/cycles
           releaseDir="$root/release"
-          pragmaDir="${{ steps.build-deps.outputs.root-dir }}"
-          depsDir="${{ steps.build-deps.outputs.deps-dir }}"
           buildDir="${{ steps.build-deps.outputs.build-dir }}"
-          cyclesDir="$releaseDir/modules/unirender/cycles"
           
-          copy_binary () {
-             cmake -DInstallSrc="$1" -DInstallDst="$cyclesDir/" -P $pragmaDir/build_scripts/cmake/install_file.cmake
-          }
-          copy_binary "$depsDir/boost_1_81_0/stage/lib/libboost_atomic.so"
-          copy_binary "$depsDir/boost_1_81_0/stage/lib/libboost_chrono.so"
-          copy_binary "$depsDir/boost_1_81_0/stage/lib/libboost_date_time.so"
-          copy_binary "$depsDir/boost_1_81_0/stage/lib/libboost_filesystem.so"
-          copy_binary "$depsDir/boost_1_81_0/stage/lib/libboost_regex.so"
-          copy_binary "$depsDir/boost_1_81_0/stage/lib/libboost_serialization.so"
-          copy_binary "$depsDir/boost_1_81_0/stage/lib/libboost_system.so"
-          copy_binary "$depsDir/boost_1_81_0/stage/lib/libboost_thread.so"
-          copy_binary "$depsDir/boost_1_81_0/stage/lib/libboost_wave.so"
-          copy_binary "$depsDir/cycles/install/lib/libIex.so"
-          copy_binary "$depsDir/cycles/install/lib/libIlmThread.so"
-          copy_binary "$depsDir/cycles/install/lib/libImath.so"
-          copy_binary "$depsDir/cycles/install/lib/libOpenColorIO.so"
-          copy_binary "$depsDir/cycles/install/lib/libOpenEXR.so"
-          copy_binary "$depsDir/cycles/install/lib/libOpenEXRCore.so"
-          copy_binary "$depsDir/cycles/install/lib/libOpenEXRUtil.so"
-          copy_binary "$depsDir/cycles/install/lib/libOpenImageIO.so"
-          copy_binary "$depsDir/cycles/install/lib/libOpenImageIO_Util.so"
-          copy_binary "$depsDir/cycles/install/lib/libopenvdb.so"
-          copy_binary "$depsDir/cycles/install/lib/liboslcomp.so"
-          copy_binary "$depsDir/cycles/install/lib/liboslexec.so"
-          copy_binary "$depsDir/cycles/install/lib/liboslnoise.so"
-          copy_binary "$depsDir/cycles/install/lib/liboslquery.so"
-          copy_binary "$buildDir/modules/pr_unirender/external_libs/cycles/RelWithDebInfo/libUniRender_cycles.so"
-          
-          mkdir -p "$cyclesDir/source"
-          cp -r "$depsDir/cycles/src/kernel" "$cyclesDir/source/kernel"
-          cp -r "$depsDir/cycles/src/util" "$cyclesDir/source/util"
-          
-          # We're using " 2>/dev/null || :" to ignore errors if the files don't exist
-          cp $depsDir/cycles/build/src/kernel/*.ptx "$cyclesDir/source/kernel/" 2>/dev/null || :
-          cp $depsDir/cycles/build/src/kernel/*.cubin "$cyclesDir/source/kernel/" 2>/dev/null || :
-
-      - name: Copy render_raytracing files
-        shell: bash
-        run: |
-          mkdir -p "release/lib"
-          cp "${{ steps.build-deps.outputs.install-dir }}/lib/librender_raytracing_lib.so" "release/lib" || true
-          cp "${{ steps.build-deps.outputs.install-dir }}/lib/render_raytracing" "release/lib" || true
-          cp "${{ steps.build-deps.outputs.install-dir }}/lib/libutil_raytracing.so" "release/lib" || true
-          cp "${{ steps.build-deps.outputs.install-dir }}/lib/libOpenColorIO*" "release/lib" || true
-          cp "${{ steps.build-deps.outputs.install-dir }}/lib/libOpenImageDenoise*" "release/lib" || true
+          cmake -DCMAKE_INSTALL_PREFIX="$releaseDir/" -DCOMPONENT=UniRender_cycles -DBUILD_TYPE=RelWithDebInfo -P "$buildDir/cmake_install.cmake"
 
       - name: Release Binaries
         uses: Silverlan/common_actions/release_nightly_binaries@main
