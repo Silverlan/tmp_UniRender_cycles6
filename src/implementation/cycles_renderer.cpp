@@ -1608,7 +1608,7 @@ bool pragma::scenekit::cycles::Renderer::Initialize(pragma::scenekit::Scene &sce
 		if(!udmDebugScene["outputFileName"](outputFileName)) {
 			outputFileName = "temp/cycles/";
 			filemanager::create_path(outputFileName);
-			outputFileName = util::get_program_path() + '/' + outputFileName + "debug_scene.png";
+			outputFileName = util::FilePath(filemanager::get_program_write_path(), outputFileName, "debug_scene.png").GetString();
 		}
 		std::vector<std::string> xmlFiles;
 		udmDebugScene["xmlFiles"](xmlFiles);
@@ -2197,7 +2197,9 @@ void pragma::scenekit::cycles::Renderer::WriteRenderTile(pragma::scenekit::TileM
 extern "C" {
 bool DLLEXPORT create_renderer(const pragma::scenekit::Scene &scene, pragma::scenekit::Renderer::Flags flags, std::shared_ptr<pragma::scenekit::Renderer> &outRenderer, std::string &outErr)
 {
-	auto kernelPath = util::get_program_path() + "/modules/unirender/cycles";
+	std::string kernelPath = "modules/unirender/cycles";
+	if(!filemanager::find_absolute_path(kernelPath, kernelPath))
+		kernelPath = util::DirPath(util::get_program_path(), kernelPath).GetString();
 	set_kernel_path(kernelPath);
 
 	// Cycles can build the kernels during runtime if they don't exist, but unfortunately

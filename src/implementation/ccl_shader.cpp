@@ -434,7 +434,7 @@ std::shared_ptr<pragma::scenekit::CCLShader> pragma::scenekit::CCLShader::Create
 		auto &graph = shader->m_cclGraph;
 		auto localDumpPath = util::Path::CreatePath("temp/cycles/graph_dump");
 		filemanager::create_path(localDumpPath.GetString());
-		auto dumpPath = util::Path::CreatePath(util::get_program_path()) + localDumpPath;
+		auto dumpPath = util::Path::CreatePath(filemanager::get_program_write_path()) + localDumpPath;
 		auto idx = desc.GetIndex();
 		std::string fileName = "graph_" + util::uuid_to_string(util::generate_uuid_v4()) + ".txt";
 		auto filePath = dumpPath + util::Path::CreateFile(fileName);
