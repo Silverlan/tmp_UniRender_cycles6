@@ -19,8 +19,7 @@ export module pragma.scenekit.cycles:ccl_shader;
 
 import pragma.scenekit;
 
-export namespace pragma::scenekit
-{
+export namespace pragma::scenekit {
 	namespace cycles {
 		class Renderer;
 		ccl::NodeMathType to_ccl_type(pragma::scenekit::nodes::math::MathType type);
@@ -49,6 +48,33 @@ export namespace pragma::scenekit
 	};
 	using GroupSocketTranslationTable = std::unordered_map<Socket, GroupSocketTranslation, SocketHasher>;
 	struct CCLNodeFactory;
+
+	struct CCLShaderWrapper {
+	  public:
+		CCLShaderWrapper(ccl::Shader &shader);
+		CCLShaderWrapper(std::unique_ptr<ccl::Shader> &&shader);
+		ccl::Shader *GetShader() const;
+		ccl::Shader *operator->() const;
+		ccl::Shader &operator*() const;
+		std::unique_ptr<ccl::Shader> Steal();
+	  private:
+		std::unique_ptr<ccl::Shader> m_cclShader;
+		ccl::Shader *m_externallyOwnedShader = nullptr;
+	};
+
+	class CCLShaderGraphWrapper {
+	  public:
+		CCLShaderGraphWrapper(ccl::ShaderGraph &graph);
+		CCLShaderGraphWrapper(std::unique_ptr<ccl::ShaderGraph> &&graph);
+		ccl::ShaderGraph *GetGraph() const;
+		ccl::ShaderGraph *operator->() const;
+		ccl::ShaderGraph &operator*() const;
+		std::unique_ptr<ccl::ShaderGraph> Steal();
+	  private:
+		std::unique_ptr<ccl::ShaderGraph> m_cclGraph;
+		ccl::ShaderGraph *m_externallyOwnedGraph = nullptr;
+	};
+
 	class CCLShader : public std::enable_shared_from_this<CCLShader>, public BaseObject {
 	  public:
 		enum class Flags : uint8_t {
@@ -58,7 +84,7 @@ export namespace pragma::scenekit
 			CCLShaderGraphOwnedByScene = CCLShaderOwnedByScene << 1u
 		};
 		static std::shared_ptr<CCLShader> Create(cycles::Renderer &renderer, const GroupNodeDesc &desc);
-		static std::shared_ptr<CCLShader> Create(cycles::Renderer &renderer, ccl::Shader &cclShader, const GroupNodeDesc &desc, bool useCache = false);
+		static std::shared_ptr<CCLShader> Create(cycles::Renderer &renderer, CCLShaderWrapper cclShader, const GroupNodeDesc &desc, bool useCache = false);
 		static ccl::ShaderInput *FindInput(ccl::ShaderNode &node, const std::string &inputName);
 		static ccl::ShaderOutput *FindOutput(ccl::ShaderNode &node, const std::string &outputName);
 		static const ccl::SocketType *FindProperty(ccl::ShaderNode &node, const std::string &inputName);
@@ -69,7 +95,7 @@ export namespace pragma::scenekit
 		ccl::Shader *operator->();
 		ccl::Shader *operator*();
 	  protected:
-		CCLShader(cycles::Renderer &renderer, ccl::Shader &cclShader, ccl::ShaderGraph &cclShaderGraph);
+		CCLShader(cycles::Renderer &renderer, CCLShaderWrapper cclShader, CCLShaderGraphWrapper cclShaderGraph);
 		virtual void DoFinalize(Scene &scene) override;
 		void InitializeNode(const NodeDesc &desc, std::unordered_map<const NodeDesc *, ccl::ShaderNode *> &nodeToCclNode, const GroupSocketTranslationTable &groupIoSockets);
 		static std::string TranslateInputName(const ccl::ShaderNode &node, const std::string &inputName);
@@ -87,8 +113,13 @@ export namespace pragma::scenekit
 		};
 		std::unique_ptr<BaseNodeWrapper> ResolveCustomNode(const std::string &typeName);
 		ccl::ShaderNode *AddNode(const std::string &type);
-		ccl::Shader &m_cclShader;
-		ccl::ShaderGraph &m_cclGraph;
+
+		ccl::Shader *GetCclShader() { return m_cclShader.GetShader(); }
+		ccl::ShaderGraph *GetCclGraph() { return m_cclGraph.GetGraph(); }
+
+		CCLShaderWrapper m_cclShader;
+		CCLShaderGraphWrapper m_cclGraph;
+
 		Flags m_flags = Flags::None;
 		cycles::Renderer &m_renderer;
 	};

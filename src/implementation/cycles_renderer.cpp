@@ -34,6 +34,7 @@ module;
 #include <mathutil/units.h>
 #include <util/path.h>
 #include <udm.hpp>
+
 #ifdef _WIN32
 #define ENABLE_CYCLES_LOGGING
 #endif
@@ -158,7 +159,7 @@ ccl::float3 pragma::scenekit::cycles::Renderer::ToCyclesPosition(const Vector3 &
 #else
 	ccl::float3 cpos {-pos.x, pos.y, pos.z};
 #endif
-	cpos = cpos *static_cast<float>(scale);
+	cpos = cpos * static_cast<float>(scale);
 	return cpos;
 }
 
@@ -288,8 +289,7 @@ ccl::SessionParams pragma::scenekit::cycles::Renderer::GetSessionParameters(cons
 	return sessionParams;
 }
 
-// Hip is not yet fully implemented in Cycles X, so it's currently disabled (state: 22-02-03)
-// #define ENABLE_AMD_HIP
+#define ENABLE_AMD_HIP
 std::optional<ccl::DeviceInfo> pragma::scenekit::cycles::Renderer::InitializeDevice(const pragma::scenekit::Scene &scene, std::string &outErr)
 {
 	init_cycles();
@@ -399,9 +399,9 @@ void pragma::scenekit::cycles::Renderer::InitializeSession(pragma::scenekit::Sce
 	auto sessionParams = GetSessionParameters(scene, devInfo);
 	m_cclSession = std::make_unique<ccl::Session>(sessionParams, sceneParams);
 
-	auto *cclScene = m_cclSession->scene; // new ccl::Scene{sceneParams,m_cclSession->device}; // Object will be removed automatically by cycles
+	auto &cclScene = m_cclSession->scene; // new ccl::Scene{sceneParams,m_cclSession->device}; // Object will be removed automatically by cycles
 	cclScene->params.bvh_type = ccl::BVHType::BVH_TYPE_STATIC;
-	m_cclScene = cclScene;
+	m_cclScene = cclScene.get();
 
 	auto &createInfo = scene.GetCreateInfo();
 	/*if(createInfo.progressive)
@@ -472,9 +472,10 @@ static void initialize_attribute(ccl::Geometry &mesh, ccl::AttributeStandard att
 
 void pragma::scenekit::cycles::Renderer::SyncObject(const pragma::scenekit::Object &obj)
 {
-	auto *cclObj = new ccl::Object {};
+	auto pcclObj = std::make_unique<ccl::Object>();
+	auto *cclObj = pcclObj.get();
 	cclObj->name = obj.GetName();
-	m_cclScene->objects.push_back(cclObj);
+	m_cclScene->objects.push_back(std::move(pcclObj));
 	auto &pose = obj.GetPose();
 	auto cclPose = ToCyclesTransform(pose);
 	m_objectToCclObject[&obj] = {cclObj, pose};
@@ -495,8 +496,9 @@ void pragma::scenekit::cycles::Renderer::SyncObject(const pragma::scenekit::Obje
 			continue;
 		auto *shader = usedShaders[set.shaderIndex];
 
-		auto *cclHair = new ccl::Hair {};
-		m_cclScene->geometry.push_back(cclHair);
+		auto pcclHair = std::make_unique<ccl::Hair>();
+		auto *cclHair = pcclHair.get();
+		m_cclScene->geometry.push_back(std::move(pcclHair));
 
 		auto numHair = set.strandData.hairSegments.size();
 		uint32_t pointOffset = 0;
@@ -526,8 +528,9 @@ void pragma::scenekit::cycles::Renderer::SyncObject(const pragma::scenekit::Obje
 
 		//attr_uv = hair->attributes.add(name, TypeFloat2, ATTR_ELEMENT_CURVE);
 
-		auto *cclObj = new ccl::Object {};
-		m_cclScene->objects.push_back(cclObj);
+		auto pcclObj = std::make_unique<ccl::Object>();
+		auto *cclObj = pcclObj.get();
+		m_cclScene->objects.push_back(std::move(pcclObj));
 		//cclObj->set_tfm(ToCyclesTransform(obj.GetPose()));
 		cclObj->set_geometry(cclHair);
 	}
@@ -559,8 +562,9 @@ static ccl::ShaderOutput *find_output_socket(ccl::ShaderNode &node, const char *
 }
 void pragma::scenekit::cycles::Renderer::SyncMesh(const pragma::scenekit::Mesh &mesh)
 {
-	auto *cclMesh = new ccl::Mesh {};
-	m_cclScene->geometry.push_back(cclMesh);
+	auto pcclMesh = std::make_unique<ccl::Mesh>();
+	auto *cclMesh = pcclMesh.get();
+	m_cclScene->geometry.push_back(std::move(pcclMesh));
 	m_meshToCcclMesh[&mesh] = cclMesh;
 	m_cclMeshToMesh[cclMesh] = &mesh;
 
@@ -864,8 +868,9 @@ void pragma::scenekit::cycles::Renderer::SyncLight(pragma::scenekit::Scene &scen
 		cclLight = it->second;
 	}
 	else {
-		cclLight = new ccl::Light {}; // Object will be removed automatically by cycles
-		m_cclScene->lights.push_back(cclLight);
+		auto pcclLight = std::make_unique<ccl::Light>();
+		cclLight = pcclLight.get();
+		m_cclScene->lights.push_back(std::move(pcclLight));
 		m_lightToCclLight[&light] = cclLight;
 	}
 	cclLight->set_tfm(ccl::transform_identity());
@@ -1063,8 +1068,13 @@ void pragma::scenekit::cycles::Renderer::ApplyPostProcessing(uimg::ImageBuffer &
 
 std::optional<uint32_t> pragma::scenekit::cycles::Renderer::FindCCLObjectId(const ccl::Object &o) const
 {
-	auto it = std::find(m_cclScene->objects.begin(), m_cclScene->objects.end(), &o);
-	return (it != m_cclScene->objects.end()) ? (it - m_cclScene->objects.begin()) : std::optional<uint32_t> {};
+	size_t idx = 0;
+	for(auto *oOther : m_cclScene->objects) {
+		if(oOther == &o)
+			return idx;
+		++idx;
+	}
+	return std::optional<uint32_t> {};
 }
 
 struct Options {
@@ -1150,7 +1160,7 @@ static void session_print_status(Options &opts)
 
 class COIIOOutputDriver : public ccl::OutputDriver {
   public:
-	typedef ccl::function<void(const ccl::string &)> LogFunction;
+	typedef std::function<void(const ccl::string &)> LogFunction;
 
 	COIIOOutputDriver(const ccl::string_view filepath, const ccl::string_view pass, LogFunction log);
 	virtual ~COIIOOutputDriver();
@@ -1204,34 +1214,29 @@ void COIIOOutputDriver::write_render_tile(const Tile &tile)
 void pragma::scenekit::cycles::Renderer::AddDebugSky()
 {
 	auto *shader = m_cclScene->default_background;
-	auto *graph = new ccl::ShaderGraph();
+	auto graph = std::make_unique<ccl::ShaderGraph>();
 
-	const ccl::NodeType *skyTexNodeType = ccl::NodeType::find(ccl::ustring {"sky_texture"});
-	auto skyTex = (ccl::SkyTextureNode *)skyTexNodeType->create(skyTexNodeType);
-	skyTex->set_owner(graph);
+	auto *skyTex = graph->create_node<ccl::SkyTextureNode>();
 	skyTex->set_sky_type(ccl::NodeSkyType::NODE_SKY_HOSEK);
 	skyTex->name = ccl::ustring {"tex"};
-	graph->add(skyTex);
 
-	const ccl::NodeType *bgShaderNodeType = ccl::NodeType::find(ccl::ustring {"background_shader"});
-	auto bgShader = (ccl::BackgroundNode *)bgShaderNodeType->create(bgShaderNodeType);
-	bgShader->set_owner(graph);
+	auto bgShader = graph->create_node<ccl::BackgroundNode>();
 	bgShader->set_strength(8.f);
 	bgShader->set_color({1.f, 0.f, 0.f});
 	bgShader->name = ccl::ustring {"bg"};
-	graph->add(bgShader);
 
 	graph->connect(find_output_socket(*skyTex, "color"), find_input_socket(*bgShader, "color"));
 	graph->connect(find_output_socket(*bgShader, "background"), find_input_socket(*graph->output(), "surface"));
 
-	shader->set_graph(graph);
+	shader->set_graph(std::move(graph));
 	shader->tag_update(m_cclScene);
 }
 
 ccl::Mesh *pragma::scenekit::cycles::Renderer::AddDebugMesh()
 {
-	auto *cclMesh = new ccl::Mesh {};
-	m_cclScene->geometry.push_back(cclMesh);
+	auto pcclMesh = std::make_unique<ccl::Mesh>();
+	auto *cclMesh = pcclMesh.get();
+	m_cclScene->geometry.push_back(std::move(pcclMesh));
 
 	cclMesh->name = "floor";
 	auto *mesh = cclMesh;
@@ -1280,36 +1285,36 @@ ccl::Mesh *pragma::scenekit::cycles::Renderer::AddDebugMesh()
 ccl::Object *pragma::scenekit::cycles::Renderer::AddDebugObject()
 {
 	auto *mesh = AddDebugMesh();
-	ccl::Object *object = new ccl::Object();
+	auto pobject = std::make_unique<ccl::Object>();
+	auto *object = pobject.get();
 	object->set_geometry(mesh);
 	ccl::Transform t = ccl::transform_identity();
 	object->set_tfm(t);
-	m_cclScene->objects.push_back(object);
+	m_cclScene->objects.push_back(std::move(pobject));
 	return object;
 }
 void pragma::scenekit::cycles::Renderer::AddDebugLight()
 {
-	auto *shader = new ccl::Shader {};
+	auto pshader = std::make_unique<ccl::Shader>();
+	auto *shader = pshader.get();
 	shader->name = "point_shader";
-	ccl::ShaderGraph *graph = new ccl::ShaderGraph();
+	auto graph = std::make_unique<ccl::ShaderGraph>();
 
-	const ccl::NodeType *emissionType = ccl::NodeType::find(ccl::ustring {"emission"});
-	auto emissionNode = (ccl::EmissionNode *)emissionType->create(emissionType);
-	emissionNode->set_owner(graph);
+	auto *emissionNode = graph->create_node<ccl::EmissionNode>();
 	emissionNode->name = ccl::ustring {"emission"};
 	emissionNode->set_color(ccl::float3 {0.8f, 0.1f, 0.1f} * 100.f);
-	graph->add(emissionNode);
 
 	graph->connect(find_output_socket(*emissionNode, "emission"), find_input_socket(*graph->output(), "surface"));
 
-	shader->set_graph(graph);
+	shader->set_graph(std::move(graph));
 	shader->tag_update(m_cclScene);
-	m_cclScene->shaders.push_back(shader);
+	m_cclScene->shaders.push_back(std::move(pshader));
 
 	//
 
-	auto *light = new ccl::Light {};
-	m_cclScene->lights.push_back(light);
+	auto plight = std::make_unique<ccl::Light>();
+	auto *light = plight.get();
+	m_cclScene->lights.push_back(std::move(plight));
 	light->set_light_type(ccl::LightType::LIGHT_POINT);
 	light->set_shader(shader);
 	light->set_size(1.f);
@@ -1317,32 +1322,27 @@ void pragma::scenekit::cycles::Renderer::AddDebugLight()
 }
 ccl::Shader *pragma::scenekit::cycles::Renderer::AddDebugShader()
 {
-	auto *shader = new ccl::Shader {};
+	auto pshader = std::make_unique<ccl::Shader>();
+	auto *shader = pshader.get();
 	shader->name = "shader_test";
-	ccl::ShaderGraph *graph = new ccl::ShaderGraph();
+	auto graph = std::make_unique<ccl::ShaderGraph>();
 
-	const ccl::NodeType *nodeTypeGlossy = ccl::NodeType::find(ccl::ustring {"glossy_bsdf"});
-	auto glossyNode = (ccl::GlossyBsdfNode *)nodeTypeGlossy->create(nodeTypeGlossy);
-	glossyNode->set_owner(graph);
+	auto glossyNode = graph->create_node<ccl::GlossyBsdfNode>();
 	glossyNode->name = ccl::ustring {"floor_closure2"};
 	glossyNode->set(*find_type_input(*glossyNode, "roughness"), 0.2f);
 	glossyNode->set(*find_type_input(*glossyNode, "distribution"), "beckmann");
-	graph->add(glossyNode);
 
-	const ccl::NodeType *nodeTypeCheckerTex = ccl::NodeType::find(ccl::ustring {"checker_texture"});
-	auto checkerNode = (ccl::CheckerTextureNode *)nodeTypeCheckerTex->create(nodeTypeCheckerTex);
-	checkerNode->set_owner(graph);
+	auto checkerNode = graph->create_node<ccl::CheckerTextureNode>();
 	checkerNode->name = ccl::ustring {"checker2"};
 	checkerNode->set(*find_type_input(*checkerNode, "color1"), ccl::float3 {0.8f, 0.8f, 0.8f});
 	checkerNode->set(*find_type_input(*checkerNode, "color2"), ccl::float3 {1.f, 0.1f, 0.1f});
-	graph->add(checkerNode);
 
 	graph->connect(find_output_socket(*checkerNode, "color"), find_input_socket(*glossyNode, "color"));
 	graph->connect(find_output_socket(*glossyNode, "bsdf"), find_input_socket(*graph->output(), "surface"));
 
-	shader->set_graph(graph);
+	shader->set_graph(std::move(graph));
 	shader->tag_update(m_cclScene);
-	m_cclScene->shaders.push_back(shader);
+	m_cclScene->shaders.push_back(std::move(pshader));
 	return shader;
 }
 
@@ -1361,13 +1361,13 @@ void pragma::scenekit::cycles::Renderer::InitializeDebugScene(const std::string 
 
 	opts.output_pass = "combined";
 	opts.session = m_cclSession.get();
-	opts.scene = opts.session->scene;
+	opts.scene = opts.session->scene.get();
 
 	auto &cam = GetScene().GetCamera();
 	SyncCamera(cam);
 
 	PopulateDebugScene();
-	
+
 	// TODO: Not yet implemented for Linux
 #ifndef __linux__
 	for(auto &filepath : xmlFileNames)
@@ -1632,8 +1632,8 @@ bool pragma::scenekit::cycles::Renderer::Initialize(pragma::scenekit::Scene &sce
 		numObjects += chunk.GetObjects().size();
 		numMeshes += chunk.GetMeshes().size();
 	}
-	m_cclScene->objects.reserve(m_cclScene->objects.size() + numObjects);
-	m_cclScene->geometry.reserve(m_cclScene->geometry.size() + numMeshes);
+	// m_cclScene->objects.reserve(m_cclScene->objects.size() + numObjects);
+	// m_cclScene->geometry.reserve(m_cclScene->geometry.size() + numMeshes);
 
 	auto &cam = scene.GetCamera();
 	SyncCamera(cam);
@@ -1646,7 +1646,7 @@ bool pragma::scenekit::cycles::Renderer::Initialize(pragma::scenekit::Scene &sce
 		// Note: Lights and objects have to be initialized before shaders, because they may
 		// create additional shaders.
 		auto &lights = scene.GetLights();
-		m_cclScene->lights.reserve(lights.size());
+		// m_cclScene->lights.reserve(lights.size());
 		for(auto &light : lights) {
 			light->Finalize(scene);
 			SyncLight(scene, *light);
@@ -1777,8 +1777,24 @@ bool pragma::scenekit::cycles::Renderer::Initialize(pragma::scenekit::Scene &sce
 		m_cclScene->background->set_transparent(dbgUse);
 
 	auto *bakeTarget = m_scene->GetBakeTargetName();
-	if(bakeTarget)
-		m_cclScene->bake_manager->set(m_cclScene, *bakeTarget);
+	if(bakeTarget) {
+		ccl::Object *oBakeTarget = nullptr;
+		for(auto *o : m_cclScene->objects) {
+			if(o->name == *bakeTarget) {
+				oBakeTarget = o;
+				break;
+			}
+		}
+		if(!oBakeTarget)
+			throw std::invalid_argument {"Could not find bake target '" + *bakeTarget + "'!"};
+		m_cclScene->bake_manager->set_baking(m_cclScene, true /* use */);
+		oBakeTarget->set_is_bake_target(true);
+	}
+
+	if(m_bakeData) {
+		m_cclScene->bake_manager->set_use_seed(false); // Only needed for vertex baking, which we don't use
+		m_cclScene->integrator->set_sampling_pattern(ccl::SamplingPattern::SAMPLING_PATTERN_BLUE_NOISE_ROUND);
+	}
 
 #if 0
 	{
@@ -2115,10 +2131,11 @@ void pragma::scenekit::cycles::Renderer::AddSkybox(const std::string &texture)
 	AddShader(*CCLShader::Create(*this, *m_cclScene->default_background, *desc));
 
 	// Add the light source for the background
-	auto *light = new ccl::Light {}; // Object will be removed automatically by cycles
+	auto plight = std::make_unique<ccl::Light>();
+	auto *light = plight.get();
 	light->set_tfm(ccl::transform_identity());
 
-	m_cclScene->lights.push_back(light);
+	m_cclScene->lights.push_back(std::move(plight));
 	light->set_light_type(ccl::LightType::LIGHT_BACKGROUND);
 	light->set_map_resolution(2'048);
 	light->set_shader(m_cclScene->default_background);

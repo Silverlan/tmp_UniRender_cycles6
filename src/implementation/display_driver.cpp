@@ -282,9 +282,9 @@ bool pragma::scenekit::cycles::OutputDriver::read_render_tile(const Tile &tile)
 	differentialData.resize(w * h * 4);
 
 	for(int ty = 0; ty < h; ty++) {
-		size_t offset = ty * w * 4;
-		float *primitive = primitiveData.data() + offset;
-		float *differential = differentialData.data() + offset;
+		size_t offset = ty * w;
+		float *primitive = primitiveData.data() + 3 * offset;
+		float *differential = differentialData.data() + 4 * offset;
 
 		size_t bake_offset = (y + ty) * bakeData.bakeImageWidth + x;
 		const auto *bake_pixel = bakeData.bakePixels + bake_offset;
@@ -293,12 +293,12 @@ bool pragma::scenekit::cycles::OutputDriver::read_render_tile(const Tile &tile)
 			if(bake_pixel->objectId != bakeData.objectId) {
 				primitive[0] = intToFloat(-1);
 				primitive[1] = intToFloat(-1);
+				primitive[2] = intToFloat(-1);
 			}
 			else {
-				primitive[0] = intToFloat(bake_pixel->seed);
-				primitive[1] = intToFloat(bake_pixel->primitiveId);
-				primitive[2] = bake_pixel->uv[0];
-				primitive[3] = bake_pixel->uv[1];
+				primitive[0] = bake_pixel->uv[0];
+				primitive[1] = bake_pixel->uv[1];
+				primitive[2] = intToFloat(bake_pixel->primitiveId);
 
 				differential[0] = bake_pixel->du_dx;
 				differential[1] = bake_pixel->du_dy;
@@ -306,13 +306,13 @@ bool pragma::scenekit::cycles::OutputDriver::read_render_tile(const Tile &tile)
 				differential[3] = bake_pixel->dv_dy;
 			}
 
-			primitive += 4;
+			primitive += 3;
 			differential += 4;
 			bake_pixel++;
 		}
 	}
 
-	auto imgPrimitive = uimg::ImageBuffer::Create(primitiveData.data(), w, h, uimg::Format::RGBA32, true);
+	auto imgPrimitive = uimg::ImageBuffer::Create(primitiveData.data(), w, h, uimg::Format::RGB32, true);
 	auto imgDifferential = uimg::ImageBuffer::Create(differentialData.data(), w, h, uimg::Format::RGBA32, true);
 	tile.set_pass_pixels("BakePrimitive", imgPrimitive->GetChannelCount(), reinterpret_cast<float *>(imgPrimitive->GetData()));
 	tile.set_pass_pixels("BakeDifferential", imgDifferential->GetChannelCount(), reinterpret_cast<float *>(imgDifferential->GetData()));

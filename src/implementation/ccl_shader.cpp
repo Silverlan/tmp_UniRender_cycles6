@@ -394,17 +394,46 @@ ccl::NodeVectorTransformConvertSpace pragma::scenekit::cycles::to_ccl_type(pragm
 	// Unreachable
 	return {};
 }
-std::shared_ptr<pragma::scenekit::CCLShader> pragma::scenekit::CCLShader::Create(cycles::Renderer &renderer, ccl::Shader &cclShader, const GroupNodeDesc &desc, bool useCache)
+
+pragma::scenekit::CCLShaderWrapper::CCLShaderWrapper(ccl::Shader &shader) : m_externallyOwnedShader {&shader} {}
+pragma::scenekit::CCLShaderWrapper::CCLShaderWrapper(std::unique_ptr<ccl::Shader> &&shader) : m_cclShader {std::move(shader)} {}
+ccl::Shader *pragma::scenekit::CCLShaderWrapper::GetShader() const { return m_externallyOwnedShader ? m_externallyOwnedShader : m_cclShader.get(); }
+ccl::Shader *pragma::scenekit::CCLShaderWrapper::operator->() const { return GetShader(); }
+ccl::Shader &pragma::scenekit::CCLShaderWrapper::operator*() const { return *GetShader(); }
+std::unique_ptr<ccl::Shader> pragma::scenekit::CCLShaderWrapper::Steal()
+{
+	if(m_externallyOwnedShader)
+		return {};
+	auto res = std::move(m_cclShader);
+	m_cclShader = {};
+	return res;
+}
+
+pragma::scenekit::CCLShaderGraphWrapper::CCLShaderGraphWrapper(ccl::ShaderGraph &graph) : m_externallyOwnedGraph(&graph) {}
+pragma::scenekit::CCLShaderGraphWrapper::CCLShaderGraphWrapper(std::unique_ptr<ccl::ShaderGraph> &&graph) : m_cclGraph(std::move(graph)) {}
+ccl::ShaderGraph *pragma::scenekit::CCLShaderGraphWrapper::GetGraph() const { return m_externallyOwnedGraph ? m_externallyOwnedGraph : m_cclGraph.get(); }
+ccl::ShaderGraph *pragma::scenekit::CCLShaderGraphWrapper::operator->() const { return GetGraph(); }
+ccl::ShaderGraph &pragma::scenekit::CCLShaderGraphWrapper::operator*() const { return *GetGraph(); }
+std::unique_ptr<ccl::ShaderGraph> pragma::scenekit::CCLShaderGraphWrapper::Steal()
+{
+	if(m_externallyOwnedGraph)
+		return {};
+	auto res = std::move(m_cclGraph);
+	m_cclGraph = {};
+	return res;
+}
+
+std::shared_ptr<pragma::scenekit::CCLShader> pragma::scenekit::CCLShader::Create(cycles::Renderer &renderer, CCLShaderWrapper cclShader, const GroupNodeDesc &desc, bool useCache)
 {
 	if(useCache) {
 		auto shader = renderer.GetCachedShader(desc);
 		if(shader)
 			return shader;
 	}
-	cclShader.set_volume_sampling_method(ccl::VOLUME_SAMPLING_MULTIPLE_IMPORTANCE);
+	cclShader->set_volume_sampling_method(ccl::VOLUME_SAMPLING_MULTIPLE_IMPORTANCE);
 
-	ccl::ShaderGraph *graph = new ccl::ShaderGraph();
-	auto pShader = std::shared_ptr<CCLShader> {new CCLShader {renderer, cclShader, *graph}};
+	auto graph = std::make_unique<ccl::ShaderGraph>();
+	auto pShader = std::shared_ptr<CCLShader> {new CCLShader {renderer, std::move(cclShader), std::move(graph)}};
 	pShader->m_flags |= Flags::CCLShaderOwnedByScene;
 
 	pShader->InitializeNodeGraph(desc);
@@ -417,21 +446,22 @@ std::shared_ptr<pragma::scenekit::CCLShader> pragma::scenekit::CCLShader::Create
 	auto shader = renderer.GetCachedShader(desc);
 	if(shader)
 		return shader;
-	auto *cclShader = new ccl::Shader {}; // Object will be removed automatically by cycles
+	auto pcclShader = std::make_unique<ccl::Shader>();
+	auto *cclShader = pcclShader.get();
 	cclShader->name = desc.GetName();
-	renderer.GetCclScene()->shaders.push_back(cclShader);
+	renderer.GetCclScene()->shaders.push_back(std::move(pcclShader));
 	shader = Create(renderer, *cclShader, desc, true);
 	auto apiData = renderer.GetApiData();
 
 	auto dontSimplify = false;
 	apiData.GetFromPath("cycles/shader/dontSimplifyGraphs")(dontSimplify);
 	if(!dontSimplify)
-		shader->m_cclGraph.simplify(renderer.GetCclScene());
+		shader->m_cclGraph->simplify(renderer.GetCclScene());
 
 	auto dumpGraphs = false;
 	apiData.GetFromPath("cycles/debug/dump_shader_graphs")(dumpGraphs);
 	if(dumpGraphs) {
-		auto &graph = shader->m_cclGraph;
+		auto &graph = *shader->m_cclGraph;
 		auto localDumpPath = util::Path::CreatePath("temp/cycles/graph_dump");
 		filemanager::create_path(localDumpPath.GetString());
 		auto dumpPath = util::Path::CreatePath(filemanager::get_program_write_path()) + localDumpPath;
@@ -443,25 +473,22 @@ std::shared_ptr<pragma::scenekit::CCLShader> pragma::scenekit::CCLShader::Create
 	return shader;
 }
 
-pragma::scenekit::CCLShader::CCLShader(cycles::Renderer &renderer, ccl::Shader &cclShader, ccl::ShaderGraph &cclShaderGraph) : m_renderer {renderer}, m_cclShader {cclShader}, m_cclGraph {cclShaderGraph} {}
+pragma::scenekit::CCLShader::CCLShader(cycles::Renderer &renderer, CCLShaderWrapper cclShader, CCLShaderGraphWrapper cclShaderGraph) : m_renderer {renderer}, m_cclShader {std::move(cclShader)}, m_cclGraph {std::move(cclShaderGraph)} {}
 
-pragma::scenekit::CCLShader::~CCLShader()
-{
-	if(umath::is_flag_set(m_flags, Flags::CCLShaderGraphOwnedByScene) == false)
-		delete &m_cclGraph;
-	if(umath::is_flag_set(m_flags, Flags::CCLShaderOwnedByScene) == false)
-		delete &m_cclShader;
-}
+pragma::scenekit::CCLShader::~CCLShader() {}
 
-ccl::Shader *pragma::scenekit::CCLShader::operator->() { return &m_cclShader; }
-ccl::Shader *pragma::scenekit::CCLShader::operator*() { return &m_cclShader; }
+ccl::Shader *pragma::scenekit::CCLShader::operator->() { return m_cclShader.GetShader(); }
+ccl::Shader *pragma::scenekit::CCLShader::operator*() { return m_cclShader.GetShader(); }
 
 void pragma::scenekit::CCLShader::DoFinalize(Scene &scene)
 {
 	BaseObject::DoFinalize(scene);
 	m_flags |= Flags::CCLShaderGraphOwnedByScene | Flags::CCLShaderOwnedByScene;
-	m_cclShader.set_graph(&m_cclGraph);
-	m_cclShader.tag_update(m_renderer.GetCclScene());
+	auto cclGraph = m_cclGraph.Steal();
+	if(!cclGraph)
+		throw std::runtime_error {"Attempted to finalize externally-owned shader, this is not allowed!"};
+	m_cclShader->set_graph(std::move(cclGraph));
+	m_cclShader->tag_update(m_renderer.GetCclScene());
 }
 
 std::unique_ptr<pragma::scenekit::CCLShader::BaseNodeWrapper> pragma::scenekit::CCLShader::ResolveCustomNode(const std::string &typeName)
@@ -503,19 +530,19 @@ std::unique_ptr<pragma::scenekit::CCLShader::BaseNodeWrapper> pragma::scenekit::
 		wrapper->imageTexNode->set_alpha_type(ccl::ImageAlphaType::IMAGE_ALPHA_IGNORE);
 
 		auto *sep = static_cast<ccl::SeparateRGBNode *>(AddNode(pragma::scenekit::NODE_SEPARATE_RGB));
-		m_cclGraph.connect(FindOutput(*wrapper->imageTexNode, pragma::scenekit::nodes::image_texture::OUT_COLOR), FindInput(*sep, pragma::scenekit::nodes::separate_rgb::IN_COLOR));
+		m_cclGraph->connect(FindOutput(*wrapper->imageTexNode, pragma::scenekit::nodes::image_texture::OUT_COLOR), FindInput(*sep, pragma::scenekit::nodes::separate_rgb::IN_COLOR));
 
 		auto *cmb = static_cast<ccl::CombineRGBNode *>(AddNode(pragma::scenekit::NODE_COMBINE_RGB));
-		m_cclGraph.connect(FindOutput(*sep, pragma::scenekit::nodes::separate_rgb::OUT_R), FindInput(*cmb, pragma::scenekit::nodes::combine_rgb::IN_G));
-		m_cclGraph.connect(FindOutput(*sep, pragma::scenekit::nodes::separate_rgb::OUT_G), FindInput(*cmb, pragma::scenekit::nodes::combine_rgb::IN_R));
-		m_cclGraph.connect(FindOutput(*sep, pragma::scenekit::nodes::separate_rgb::OUT_B), FindInput(*cmb, pragma::scenekit::nodes::combine_rgb::IN_B));
+		m_cclGraph->connect(FindOutput(*sep, pragma::scenekit::nodes::separate_rgb::OUT_R), FindInput(*cmb, pragma::scenekit::nodes::combine_rgb::IN_G));
+		m_cclGraph->connect(FindOutput(*sep, pragma::scenekit::nodes::separate_rgb::OUT_G), FindInput(*cmb, pragma::scenekit::nodes::combine_rgb::IN_R));
+		m_cclGraph->connect(FindOutput(*sep, pragma::scenekit::nodes::separate_rgb::OUT_B), FindInput(*cmb, pragma::scenekit::nodes::combine_rgb::IN_B));
 
 		wrapper->normalMapNode = static_cast<ccl::NormalMapNode *>(AddNode(pragma::scenekit::NODE_NORMAL_MAP));
 		assert(wrapper->normalMapNode);
 		wrapper->normalMapNode->set_space(ccl::NodeNormalMapSpace::NODE_NORMAL_MAP_TANGENT);
 
 		auto *normIn = FindInput(*wrapper->normalMapNode, pragma::scenekit::nodes::normal_map::IN_COLOR);
-		m_cclGraph.connect(FindOutput(*cmb, pragma::scenekit::nodes::combine_rgb::OUT_IMAGE), normIn);
+		m_cclGraph->connect(FindOutput(*cmb, pragma::scenekit::nodes::combine_rgb::OUT_IMAGE), normIn);
 		return wrapper;
 	}
 	return nullptr;
@@ -524,14 +551,14 @@ std::unique_ptr<pragma::scenekit::CCLShader::BaseNodeWrapper> pragma::scenekit::
 ccl::ShaderNode *pragma::scenekit::CCLShader::AddNode(const std::string &typeName)
 {
 	auto *nodeType = ccl::NodeType::find(ccl::ustring {typeName});
-	auto *snode = nodeType ? static_cast<ccl::ShaderNode *>(nodeType->create(nodeType)) : nullptr;
+	if(!nodeType)
+		return nullptr;
+	auto *snode = m_cclGraph->create_node(nodeType);
 	if(snode == nullptr)
 		return nullptr;
 
 	auto name = GetCurrentInternalNodeName();
-	snode->set_owner(&m_cclGraph);
 	snode->name = name;
-	m_cclGraph.add(snode);
 	return snode;
 }
 
@@ -591,14 +618,14 @@ void pragma::scenekit::CCLShader::InitializeNode(const NodeDesc &desc, std::unor
 				m_renderer.GetScene().HandleError("Invalid CCL input '" + cclToSocket->second + "' for node of type '" + std::string {typeid(*cclToSocket->first).name()} + "'!");
 				continue;
 			}
-			m_cclGraph.connect(output, input);
+			m_cclGraph->connect(output, input);
 		}
 		return;
 	}
 	auto &typeName = desc.GetTypeName();
 	if(typeName == "output") {
 		// Output node already exists by default
-		nodeToCclNode[&desc] = m_cclGraph.output();
+		nodeToCclNode[&desc] = m_cclGraph->output();
 		return;
 	}
 	struct CclNodeWrapper : public pragma::scenekit::CCLShader::BaseNodeWrapper {
@@ -911,14 +938,20 @@ ccl::ShaderInput *pragma::scenekit::CCLShader::FindInput(ccl::ShaderNode &node, 
 {
 	// return node.input(ccl::ustring{inputName}); // Doesn't work in some cases for some reason
 	auto translatedInputName = TranslateInputName(node, inputName);
-	auto it = std::find_if(node.inputs.begin(), node.inputs.end(), [&translatedInputName](const ccl::ShaderInput *shInput) { return ccl::string_iequals(shInput->socket_type.name.string(), translatedInputName); });
-	return (it != node.inputs.end()) ? *it : nullptr;
+	for(auto *shInput : node.inputs) {
+		if(ccl::string_iequals(shInput->socket_type.name.string(), translatedInputName))
+			return shInput;
+	}
+	return nullptr;
 }
 ccl::ShaderOutput *pragma::scenekit::CCLShader::FindOutput(ccl::ShaderNode &node, const std::string &outputName)
 {
 	// return node.output(ccl::ustring{outputName}); // Doesn't work in some cases for some reason
-	auto it = std::find_if(node.outputs.begin(), node.outputs.end(), [&outputName](const ccl::ShaderOutput *shOutput) { return ccl::string_iequals(shOutput->socket_type.name.string(), outputName); });
-	return (it != node.outputs.end()) ? *it : nullptr;
+	for(auto *shOutput : node.outputs) {
+		if(ccl::string_iequals(shOutput->socket_type.name.string(), outputName))
+			return shOutput;
+	}
+	return nullptr;
 }
 
-std::string pragma::scenekit::CCLShader::GetCurrentInternalNodeName() const { return "internal_" + std::to_string(m_cclGraph.nodes.size()); }
+std::string pragma::scenekit::CCLShader::GetCurrentInternalNodeName() const { return "internal_" + std::to_string(m_cclGraph->nodes.size()); }
