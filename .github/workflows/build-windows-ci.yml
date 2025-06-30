@@ -48,13 +48,8 @@ jobs:
       - name: Copy UniRender_cycles files
         shell: bash
         run: |
-          root="$PWD"
-          cd $root
-          mkdir -p "$root"
-          releaseDir="$root/release"
-          buildDir="${{ steps.build-deps.outputs.build-dir }}"
-
-          cmake -DCMAKE_INSTALL_PREFIX="$releaseDir/" -DCOMPONENT=UniRender_cycles -DBUILD_TYPE=RelWithDebInfo -P "$buildDir/cmake_install.cmake"
+          mkdir -p release
+          cp -a "${{ steps.build-deps.outputs.deps-dir }}/staging/cycles/." release/
         
       - name: Release Binaries
         uses: Silverlan/common_actions/release_nightly_binaries@main
