@@ -61,9 +61,6 @@ pr_add_external_dependency(${PROJ_NAME} alembic LIBRARY PRIVATE)
 find_package(openimagedenoise REQUIRED)
 pr_add_external_dependency(${PROJ_NAME} openimagedenoise LIBRARY PRIVATE)
 
-find_package(boost_cycles REQUIRED)
-pr_add_external_dependency(${PROJ_NAME} boost_cycles LIBRARY PRIVATE)
-
 find_package(cycles REQUIRED)
 pr_add_external_dependency(${PROJ_NAME} cycles LIBRARY PRIVATE)
 
