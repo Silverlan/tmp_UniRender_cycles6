@@ -45,6 +45,7 @@ jobs:
           # This will build the core dependencies, as well as cycles, but not Pragma
           build-args: "--with-essential-client-modules=0 --with-common-modules=0 --with-lua-debugger=0 --module pr_unirender:\"https://github.com/Silverlan/pr_cycles.git\" --build 0 --build-cycles"
 
+      # Note: The libraries need to correspond to the ones in build.py and build_cycles.py
       - name: Build UniRender_cycles
         shell: bash
         run: |
@@ -54,7 +55,24 @@ jobs:
           
           cd $root
           mkdir -p release
-          cp -a "${{ steps.build-deps.outputs.deps-dir }}/staging/cycles/." release/
+          staging="${{ steps.build-deps.outputs.deps-dir }}/staging"
+          cp -a "${staging}/alembic" release/
+          cp -a "${staging}/embree" release/
+          cp -a "${staging}/jpeg" release/
+          cp -a "${staging}/llvm" release/
+          cp -a "${staging}/openexr" release/
+          cp -a "${staging}/openvdb" release/
+          cp -a "${staging}/png" release/
+          cp -a "${staging}/tiff" release/
+          cp -a "${staging}/zstd" release/
+
+          cp -a "${staging}/cycles" release/
+          cp -a "${staging}/imath" release/
+          cp -a "${staging}/opencolorio" release/
+          cp -a "${staging}/openimagedenoise" release/
+          cp -a "${staging}/openimageio" release/
+          cp -a "${staging}/opensubdiv" release/
+          cp -a "${staging}/tbb" release/
 
       - name: Release Binaries
         uses: Silverlan/common_actions/release_nightly_binaries@main
