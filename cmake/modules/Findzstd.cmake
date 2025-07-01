@@ -11,7 +11,7 @@ find_path(${PCK}_INCLUDE_DIR
 )
 
 find_library(${PCK}_LIBRARY
-  NAMES zstd
+  NAMES zstd zstd_static
   HINTS
     ${PRAGMA_DEPS_DIR}/zstd/lib
 )

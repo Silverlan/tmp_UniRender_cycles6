@@ -22,9 +22,12 @@ set(cycles_libs
   cycles_util
   extern_cuew
   extern_hipew
-  extern_libc_compat
   extern_sky
 )
+
+if(UNIX)
+  set(cycles_libs ${cycles_libs} extern_libc_compat)
+endif()
 
 set(cycles_lib_list)
 foreach(LIB IN LISTS cycles_libs)
