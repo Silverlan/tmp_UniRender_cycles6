@@ -17,7 +17,14 @@ find_library(${PCK}_LIBRARY
 )
 
 set(REQ_VARS ${PCK}_LIBRARY ${PCK}_INCLUDE_DIR)
+set(LIBS ${${PCK}_LIBRARY})
 if(WIN32)
+  find_library(${PCK}_TBB12_LIBRARY
+    NAMES tbb12
+    HINTS
+      ${PRAGMA_DEPS_DIR}/tbb/lib
+  )
+  set(LIBS ${LIBS} ${${PCK}_TBB12_LIBRARY})
   find_file(
     ${PCK}_TBB_RUNTIME
     NAMES tbb12.dll
@@ -33,7 +40,7 @@ if(WIN32)
     NAMES tbbmalloc_proxy.dll
     HINTS ${PRAGMA_DEPS_DIR}/tbb/bin
   )
-  set(REQ_VARS ${REQ_VARS} ${PCK}_TBB_RUNTIME ${PCK}_TBB_MALLOC_RUNTIME ${PCK}_TBB_MALLOC_PROXY_RUNTIME)
+  set(REQ_VARS ${REQ_VARS} ${PCK}_TBB12_LIBRARY ${PCK}_TBB_RUNTIME ${PCK}_TBB_MALLOC_RUNTIME ${PCK}_TBB_MALLOC_PROXY_RUNTIME)
 endif()
 
 include(FindPackageHandleStandardArgs)
@@ -42,7 +49,7 @@ find_package_handle_standard_args(${PCK}
 )
 
 if(${PCK}_FOUND)
-  set(${PCK}_LIBRARIES   ${${PCK}_LIBRARY})
+  set(${PCK}_LIBRARIES   ${LIBS})
   set(${PCK}_INCLUDE_DIRS ${${PCK}_INCLUDE_DIR})
   if(WIN32)
     set(${PCK}_RUNTIME ${${PCK}_TBB_RUNTIME} ${${PCK}_TBB_MALLOC_RUNTIME} ${${PCK}_TBB_MALLOC_PROXY_RUNTIME})

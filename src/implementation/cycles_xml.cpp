@@ -16,9 +16,11 @@
 
 module;
 
-#ifdef __linux__
 module pragma.scenekit.cycles;
-#else
+
+// XML debug test code
+// Currently unused/deactivated
+#if 0
 #include <stdio.h>
 
 #include <algorithm>

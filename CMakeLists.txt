@@ -19,50 +19,29 @@ pr_init_module(${PROJ_NAME})
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/modules")
 
-find_package(openimageio REQUIRED)
-pr_add_external_dependency(${PROJ_NAME} openimageio LIBRARY PRIVATE)
+pr_add_third_party_dependency(${PROJ_NAME} openimageio)
+pr_add_third_party_dependency(${PROJ_NAME} openexr)
+pr_add_third_party_dependency(${PROJ_NAME} imath)
+pr_add_third_party_dependency(${PROJ_NAME} tbb)
+pr_add_third_party_dependency(${PROJ_NAME} jpeg)
+pr_add_third_party_dependency(${PROJ_NAME} tiff)
+pr_add_third_party_dependency(${PROJ_NAME} png)
+pr_add_third_party_dependency(${PROJ_NAME} zstd)
+pr_add_third_party_dependency(${PROJ_NAME} llvm)
+pr_add_third_party_dependency(${PROJ_NAME} embree)
+pr_add_third_party_dependency(${PROJ_NAME} openvdb)
+pr_add_third_party_dependency(${PROJ_NAME} opencolorio)
+pr_add_third_party_dependency(${PROJ_NAME} alembic)
+pr_add_third_party_dependency(${PROJ_NAME} openimagedenoise)
+pr_add_third_party_dependency(${PROJ_NAME} cycles)
 
-find_package(openexr REQUIRED)
-pr_add_external_dependency(${PROJ_NAME} openexr LIBRARY PRIVATE)
+if(WIN32)
+	pr_add_third_party_dependency(${PROJ_NAME} gflags)
+	pr_add_third_party_dependency(${PROJ_NAME} glog)
 
-find_package(imath REQUIRED)
-pr_add_external_dependency(${PROJ_NAME} imath LIBRARY PRIVATE)
-
-find_package(tbb REQUIRED)
-pr_add_external_dependency(${PROJ_NAME} tbb LIBRARY PRIVATE)
-
-find_package(jpeg REQUIRED)
-pr_add_external_dependency(${PROJ_NAME} jpeg LIBRARY PRIVATE)
-
-find_package(tiff REQUIRED)
-pr_add_external_dependency(${PROJ_NAME} tiff LIBRARY PRIVATE)
-
-find_package(png REQUIRED)
-pr_add_external_dependency(${PROJ_NAME} png LIBRARY PRIVATE)
-
-find_package(zstd REQUIRED)
-pr_add_external_dependency(${PROJ_NAME} zstd LIBRARY PRIVATE)
-
-find_package(llvm REQUIRED)
-pr_add_external_dependency(${PROJ_NAME} llvm LIBRARY PRIVATE)
-
-find_package(embree REQUIRED)
-pr_add_external_dependency(${PROJ_NAME} embree LIBRARY PRIVATE)
-
-find_package(openvdb REQUIRED)
-pr_add_external_dependency(${PROJ_NAME} openvdb LIBRARY PRIVATE)
-
-find_package(opencolorio REQUIRED)
-pr_add_external_dependency(${PROJ_NAME} opencolorio LIBRARY PRIVATE)
-
-find_package(alembic REQUIRED)
-pr_add_external_dependency(${PROJ_NAME} alembic LIBRARY PRIVATE)
-
-find_package(openimagedenoise REQUIRED)
-pr_add_external_dependency(${PROJ_NAME} openimagedenoise LIBRARY PRIVATE)
-
-find_package(cycles REQUIRED)
-pr_add_external_dependency(${PROJ_NAME} cycles LIBRARY PRIVATE)
+	# Only needed for testing code
+	# pr_add_third_party_dependency(${PROJ_NAME} pugixml)
+endif()
 
 # These have to match the definitions in the cycles project!
 pr_add_compile_definitions(${PROJ_NAME}
