@@ -5,7 +5,7 @@ if (${PCK}_FOUND)
 endif()
 
 find_path(${PCK}_INCLUDE_DIR
-  NAMES logging.h
+  NAMES glog/logging.h
   HINTS
     ${PRAGMA_DEPS_DIR}/glog/include
 )
