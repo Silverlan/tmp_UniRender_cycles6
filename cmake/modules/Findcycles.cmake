@@ -11,15 +11,15 @@ find_path(${PCK}_INCLUDE_DIR
 )
 
 set(cycles_libs
+	cycles_bvh
   cycles_device
+  cycles_graph
+  cycles_integrator
   cycles_kernel
   cycles_scene
   cycles_session
-	cycles_bvh
   cycles_subd
-  cycles_graph
   cycles_util
-  cycles_integrator
   extern_cuew
   extern_hipew
   extern_sky
