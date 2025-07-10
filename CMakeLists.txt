@@ -19,9 +19,6 @@ pr_init_module(${PROJ_NAME})
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/modules")
 
-#pr_add_third_party_dependency(${PROJ_NAME} openimagedenoise)
-#pr_add_third_party_dependency(${PROJ_NAME} cycles)
-#pr_add_third_party_dependency(${PROJ_NAME} tbb)
 pr_add_third_party_dependency(${PROJ_NAME} openimageio)
 pr_add_third_party_dependency(${PROJ_NAME} openexr)
 pr_add_third_party_dependency(${PROJ_NAME} jpeg)
@@ -33,7 +30,6 @@ pr_add_third_party_dependency(${PROJ_NAME} embree)
 pr_add_third_party_dependency(${PROJ_NAME} openvdb)
 pr_add_third_party_dependency(${PROJ_NAME} opencolorio)
 pr_add_third_party_dependency(${PROJ_NAME} alembic)
-
 pr_add_third_party_dependency(${PROJ_NAME} openimagedenoise)
 pr_add_third_party_dependency(${PROJ_NAME} cycles)
 pr_add_third_party_dependency(${PROJ_NAME} tbb)
